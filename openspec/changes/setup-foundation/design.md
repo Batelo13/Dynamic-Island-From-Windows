@@ -29,6 +29,7 @@ Duas janelas top-level do mesmo processo e thread:
 Na Fase 2, a cada quadro de animação atualizamos apenas a região/retângulo da janela de entrada (barato, sem repintura visível); a janela visual nunca é redimensionada durante a animação, eliminando tremor.
 - **Alternativas:** `WM_NCHITTEST → HTTRANSPARENT` (não repassa cliques entre processos); uma janela só com `SetWindowRgn` (recorta sombra e conteúdo que sai da forma); alternar `WS_EX_TRANSPARENT` via hook global de mouse (custo constante, risco com anti-cheat — descartado).
 - **Validação primeiro** (tarefa 2): se `LAYERED + NOREDIRECTIONBITMAP` não compor corretamente, fallback documentado é a janela única com `SetWindowRgn` e sombra desenhada dentro da região.
+- **Resultado (2026-11-25):** validado sem fallback — composição renderiza com `LAYERED + TRANSPARENT + NOREDIRECTIONBITMAP`; `scripts/check-window.ps1` confirma hit-test, cliques reais e foco (12/12). Uma terceira janela oculta (*host*) ficou responsável pela bandeja e mensagens do sistema, porque o menu da bandeja exige `SetForegroundWindow` e as janelas da ilha são `NOACTIVATE`.
 
 ### D3 — Foco
 `WS_EX_NOACTIVATE` nas duas janelas, `ShowWindow(SW_SHOWNOACTIVATE)`, `SetWindowPos(..., SWP_NOACTIVATE)` e `WM_MOUSEACTIVATE → MA_NOACTIVATE`. `WS_EX_TOOLWINDOW` tira da barra de tarefas e do Alt+Tab.
@@ -67,6 +68,6 @@ Sem traits/abstrações até haver segundo consumidor.
 
 - [`WS_EX_LAYERED` + `NOREDIRECTIONBITMAP` + composição pode não renderizar em algumas builds] → validar logo na tarefa 2; fallback D2.
 - [GPU híbrida: compositor em uma GPU, app em outra] → shapes de composição não usam device D3D do app; risco só a partir da Fase 2 (texto) — tratar `device lost` lá.
-- [Toolchain GNU e futuros crates com C] → só `windows`, `serde`, `serde_json`; se precisar de MSVC, troca de target sem mudar código.
+- [Toolchain GNU e futuros crates com C] → só `windows`, `windows-numerics`, `serde`, `serde_json`; se precisar de MSVC, troca de target sem mudar código. O GNU exige `dlltool` (MinGW/WinLibs) no PATH para as import libs do `windows-rs`.
 - [Ícone provisório na bandeja] → aceitável até o design system; marcado como pendência visual.
 - [Tela cheia exclusiva cobre a ilha] → esperado; tratado no modo jogo (Fase 7).

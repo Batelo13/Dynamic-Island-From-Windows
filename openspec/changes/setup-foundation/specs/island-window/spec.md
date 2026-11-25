@@ -9,7 +9,7 @@ O sistema SHALL exibir, no estado Idle, uma cápsula preta opaca com cantos tota
 
 #### Scenario: Aparência inicial
 - **WHEN** o app é iniciado sem atividades
-- **THEN** apenas a cápsula Idle é visível, com tamanho padrão de 200 × 36 DIP
+- **THEN** apenas a cápsula Idle é visível, com tamanho padrão de 126 × 37 DIP (proporção ~3,4:1 das refs 1 e 2)
 - **AND** a área ao redor da cápsula mostra o conteúdo das janelas de baixo, sem retângulo, borda ou sombra do Windows
 
 ### Requirement: Posicionamento padrão e configurável
@@ -33,7 +33,7 @@ O sistema SHALL manter tamanho físico (em DIP) e nitidez corretos em qualquer e
 
 #### Scenario: Escala diferente por monitor
 - **WHEN** a cápsula está em um monitor a 150% de escala
-- **THEN** ela mede 300 × 54 px físicos e é renderizada sem desfoque
+- **THEN** ela mede 189 × 56 px físicos e é renderizada sem desfoque
 
 #### Scenario: Mudança de resolução
 - **WHEN** a resolução ou a escala do monitor atual muda

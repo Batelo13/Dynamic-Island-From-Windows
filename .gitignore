@@ -1,0 +1,9 @@
+/target
+*.log
+# graphify: machine-specific or regenerable
+/graphify-out/cache
+/graphify-out/graph.html
+/graphify-out/cost.json
+/graphify-out/.graphify_python
+/graphify-out/.graphify_root
+/src/graphify-out
