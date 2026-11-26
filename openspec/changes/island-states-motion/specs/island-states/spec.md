@@ -1,11 +1,12 @@
 ## Purpose
 
-Define os estados visuais da Dynamic Island (Idle, Compact, Expanded), como ela transita entre eles com animação por mola e como responde ao mouse, mantendo custo zero quando parada.
+Define os estados visuais da Dynamic Island (Oculta, Idle, Compact, Expanded), como ela aparece pelo topo da tela, transita entre estados com animação por mola e responde ao mouse, mantendo custo zero quando parada.
 
 ## ADDED Requirements
 
 ### Requirement: Estados visuais
-O sistema SHALL suportar três estados visuais, todos pretos, ancorados no mesmo centro horizontal e na mesma borda superior:
+O sistema SHALL suportar quatro estados visuais, ancorados no mesmo centro horizontal; os três visíveis são pretos e compartilham a mesma borda superior:
+- **Oculta**: nada desenhado na tela; a forma fica recolhida acima do topo da área útil.
 - **Idle**: 126 × 37 DIP, raio igual a metade da altura.
 - **Compact**: pílula larga, mesma altura do Idle, com um slot à esquerda (ícone) e um à direita (informação).
 - **Expanded**: retângulo arredondado com raio de ~32 DIP, grande o bastante para título, subtítulo e uma linha de controles.
@@ -17,12 +18,35 @@ Tamanhos, raios, cores e tipografia SHALL vir de um único conjunto de tokens.
 - **THEN** o centro horizontal e a borda superior da forma permanecem fixos (tolerância de 1 px quando parada)
 
 #### Scenario: Sem atividade
-- **WHEN** não há atividade ativa
-- **THEN** a ilha fica em Idle
+- **WHEN** não há atividade ativa e a ilha não foi revelada pelo topo
+- **THEN** a ilha fica Oculta
 
 #### Scenario: Atividade ativa
 - **WHEN** uma atividade começa (no modo demo, nesta fase)
-- **THEN** a ilha passa para Compact e mostra o conteúdo da atividade nos slots
+- **THEN** a ilha passa para Compact e mostra o conteúdo da atividade nos slots, e permanece visível enquanto a atividade durar
+
+#### Scenario: Atividade termina
+- **WHEN** a atividade termina e o cursor não está sobre a ilha
+- **THEN** a ilha sobe e fica Oculta
+
+### Requirement: Revelar pelo topo
+Sem atividade, o sistema SHALL revelar a cápsula Idle quando o cursor permanecer por 150 ms numa faixa invisível de 2 px de altura × a largura do Idle, no centro superior da área útil, e SHALL ocultá-la de novo quando o cursor ficar fora dela por ~1 s. A faixa existe só enquanto a ilha está Oculta.
+
+#### Scenario: Revelar
+- **WHEN** a ilha está Oculta e o cursor fica 150 ms na faixa do centro superior
+- **THEN** a cápsula Idle desce do topo com movimento de mola, sem tomar foco
+
+#### Scenario: Passagem rápida
+- **WHEN** o cursor passa pela faixa e sai antes de 150 ms
+- **THEN** a ilha continua Oculta
+
+#### Scenario: Ocultar ao sair
+- **WHEN** a ilha foi revelada sem atividade e o cursor fica fora dela por 1 s
+- **THEN** a ilha sobe e fica Oculta
+
+#### Scenario: Fora do centro
+- **WHEN** o cursor toca o topo da tela fora da faixa (ex.: 1 px ao lado)
+- **THEN** a ilha continua Oculta
 
 ### Requirement: Transição por mola
 O sistema SHALL animar tamanho, raio e posição da forma entre estados com movimento de mola. A animação SHALL poder ser interrompida a qualquer momento, partindo da forma atual, sem saltos.
@@ -42,8 +66,8 @@ O sistema SHALL animar tamanho, raio e posição da forma entre estados com movi
 ### Requirement: Interação com o mouse
 O sistema SHALL responder ao mouse sem tomar foco:
 - cursor sobre a ilha em Idle ou Compact → leve crescimento (feedback de hover);
-- clique em Compact → passa para Expanded;
-- cursor fora da ilha por ~1 s → Expanded recolhe para Compact e o hover se desfaz.
+- clique em Idle ou Compact → passa para Expanded (sem atividade, o Expanded mostra hora e data como conteúdo provisório);
+- cursor fora da ilha por ~1 s → recolhe para Compact (com atividade) ou fica Oculta (sem atividade), e o hover se desfaz.
 
 #### Scenario: Hover
 - **WHEN** o cursor entra na ilha em Idle ou Compact
@@ -54,12 +78,12 @@ O sistema SHALL responder ao mouse sem tomar foco:
 - **THEN** a ilha passa para Expanded e a janela em primeiro plano continua a mesma
 
 #### Scenario: Clique em Idle
-- **WHEN** o usuário clica na ilha em Idle, sem atividade
-- **THEN** o estado não muda
+- **WHEN** o usuário clica na cápsula Idle revelada, sem atividade
+- **THEN** a ilha passa para Expanded mostrando hora e data, e a janela em primeiro plano continua a mesma
 
 #### Scenario: Recolher ao sair
 - **WHEN** a ilha está em Expanded e o cursor fica fora dela por 1 s (inclusive após clicar em outra aplicação)
-- **THEN** a ilha recolhe para Compact
+- **THEN** a ilha recolhe para Compact se houver atividade, ou sobe e fica Oculta se não houver
 
 #### Scenario: Volta antes do tempo
 - **WHEN** o cursor sai da ilha em Expanded e volta antes de 1 s
@@ -80,8 +104,8 @@ O sistema SHALL renderizar o texto dos estados Compact e Expanded com antisserri
 O sistema SHALL respeitar a configuração "Efeitos de animação" do Windows: quando desligada, as mudanças de estado e de hover SHALL ser aplicadas sem animação.
 
 #### Scenario: Animações desligadas
-- **WHEN** "Efeitos de animação" está desligado e a ilha muda de estado
-- **THEN** a forma final aparece imediatamente, sem movimento intermediário
+- **WHEN** "Efeitos de animação" está desligado e a ilha muda de estado, aparece ou é ocultada
+- **THEN** a forma final aparece (ou some) imediatamente, sem movimento intermediário
 
 #### Scenario: Configuração alterada com o app aberto
 - **WHEN** o usuário liga ou desliga "Efeitos de animação" com o app aberto
@@ -103,7 +127,7 @@ O sistema SHALL cancelar as interações pendentes quando a sessão é bloqueada
 
 #### Scenario: Bloqueio com a ilha expandida
 - **WHEN** a sessão é bloqueada com a ilha em Expanded
-- **THEN** ao desbloquear, a ilha aparece em Compact (ou em Idle, sem atividade), sem hover
+- **THEN** ao desbloquear, a ilha aparece em Compact (ou fica Oculta, sem atividade), sem hover
 
 ### Requirement: Modo demo em builds de debug
 Em builds de debug, o sistema SHALL oferecer na bandeja um menu "Demo" para iniciar e encerrar uma atividade de exemplo com texto placeholder. Esse menu SHALL não existir em builds de release.

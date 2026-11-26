@@ -6,8 +6,8 @@
 
 ## 2. Composição: forma, contorno, sombra, molas
 
-- [x] 2.1 Árvore da D4 (`LayerVisual` + `DropShadow`, contorno 1 px), com cores dos tokens; fallback sem sombra com log
-- [x] 2.2 `Renderer::set_shape(shape, animate)`: molas `SpringVector2` em Size/Offset/CornerRadius (D1); `Set*` direto quando `animate == false`
+- [x] 2.1 Árvore da D4 (`SpriteVisual` com `DropShadow` mascarada por `CompositionVisualSurface`, contorno 1 px), com cores dos tokens; fallback sem sombra com log
+- [x] 2.2 `Renderer::apply(frame, visual, dpi, animate)`: molas escalares por componente em Size/Offset/CornerRadius (D1); `Set*` direto quando `animate == false`
 - [x] 2.3 Região/posição da janela de entrada direto para a forma de destino (D2), com `ponytail:` comment
 - [x] 2.4 Verificar: `check-window.ps1` continua 12/12 em Idle; adicionar cheque de click-through 2 px abaixo do Expanded e sobre a sombra
 
@@ -28,10 +28,19 @@
 
 ## 5. Validação
 
-- [ ] 5.1 `cargo test`, `cargo clippy --all-targets` limpos
+- [x] 5.1 `cargo test`, `cargo clippy --all-targets` limpos
 - [ ] 5.2 Benchmark em repouso 10 min, depois de passar por Compact/Expanded (dispositivo D3D criado), registrado em `docs/benchmarks.md`; se > 50 MB, liberar dispositivo em Idle (D5)
 - [ ] 5.3 Benchmark de transições contínuas por 30 s (CPU média + retorno ao repouso em ≤ 2 s) em `docs/benchmarks.md`
 - [ ] 5.4 Manual: interrupção da mola sem salto, assentamento ≤ 600 ms, animações desligadas → instantâneo, Win+L com Expanded, troca de escala com texto, `Win+Ctrl+Shift+B` (perda de dispositivo), foco inalterado ao clicar — em `docs/testing.md`
 - [ ] 5.5 Screenshots dos 3 estados sobre fundo claro e escuro comparados com as refs 1, 2, 4 e 5; ajustar tokens
 - [ ] 5.6 Atualizar grafo com Graphify (`--update`)
 - [ ] 5.7 `openspec validate island-states-motion --strict`
+
+## 6. Auto-ocultar e revelar pelo topo (revisão de 2026-11-26)
+
+- [ ] 6.1 `Island`: estado Oculta, `revealed`, `RevealTimeout`, `Timer::StartReveal`; sair por 1 s → Compact (com atividade) ou Oculta (sem); clique em Idle → Expanded; testes unitários
+- [ ] 6.2 `window.rs`: janela de entrada vira a faixa de 2 px × largura Idle quando Oculta (D12); timer de 150 ms para revelar, cancelado no `WM_MOUSELEAVE`
+- [ ] 6.3 `layout`/`render`: forma Oculta acima da borda superior (Offset.Y negativo), mesma mola; instantâneo com animações desligadas
+- [ ] 6.4 Expanded sem atividade mostra hora e data (placeholder, desenhado ao expandir; sem relógio ao vivo)
+- [ ] 6.5 `check-window.ps1`: nada visível ao iniciar; faixa recebe e 1 px ao lado/abaixo passa; onde a cápsula apareceria passa; revela após 150 ms; oculta 1 s após sair; checagens de Idle passam a rodar com a ilha revelada
+- [ ] 6.6 Refazer 5.2/5.3 com o comportamento novo (o benchmark de 2026-11-26 mediu Idle sempre visível)

@@ -22,7 +22,7 @@ Motivação e escopo: ver `proposal.md`. Requisitos: `specs/island-states` e `sp
 ## Decisions
 
 ### D1 — Molas no compositor (NaturalMotion), não no processo
-`geometry.Size`, `geometry.Offset` e `geometry.CornerRadius` são animados com `SpringVector2NaturalMotionAnimation`. Para isso, `Compositor.CreateSpringVector2Animation` recebe `DampingRatio` e `Period` dos tokens e `FinalValue` com o destino. O compositor roda a física na própria thread e, quando há interrupção, parte do valor atual. Assim, o app não tem timer de quadro nem precisa saber quando a mola assenta.
+`geometry.Size`, `geometry.Offset` e `geometry.CornerRadius` são animados com molas NaturalMotion. Cada componente (`Size.X`, `Size.Y`, …) tem a sua própria `SpringScalarNaturalMotionAnimation`, porque o windows-rs não oferece como converter um `Vector2` no `IReference<Vector2>` que o `FinalValue` exige, enquanto `f32` converte via `PropertyValue::CreateSingle`. Todas usam os mesmos `DampingRatio`/`Period` dos tokens. O compositor roda a física na própria thread e, quando há interrupção, parte do valor atual. Assim, o app não tem timer de quadro nem precisa saber quando a mola assenta.
 - **Alternativa:** mola no processo, com `DCompositionWaitForCompositorClock` ou um timer por quadro escrevendo as propriedades. Isso dá controle quadro a quadro (região de entrada exata), mas cria um laço que precisa parar sozinho e custa CPU durante a animação. Descartada.
 - Raio e tamanho usam os mesmos parâmetros de mola, então chegam juntos, sem formas intermediárias estranhas.
 
@@ -37,11 +37,13 @@ Os quadros intermediários da mola não são observáveis sem custo. Por isso, n
 ### D4 — Árvore de composição
 ```
 ContainerVisual (raiz)
-└─ LayerVisual  (Shadow = DropShadow suave, segue o alfa do conteúdo)
-   ├─ ShapeVisual → SpriteShape(geometria animada): Fill preto, Stroke 1 px cinza-escuro
-   └─ SpriteVisual de conteúdo (CompositionSurfaceBrush ← CompositionDrawingSurface), Opacity animada
+├─ SpriteVisual de sombra (DropShadow com Mask = CompositionVisualSurface do ShapeVisual)
+├─ ShapeVisual → SpriteShape(geometria animada): Fill preto, Stroke 1 px cinza-escuro
+└─ 2× SpriteVisual de conteúdo (CompositionSurfaceBrush ← CompositionDrawingSurface), Opacity animada, alternados A/B
 ```
-- A sombra de `LayerVisual` acompanha a forma animada sem redesenho.
+- A máscara é uma superfície viva do `ShapeVisual`, então a sombra acompanha as molas sem redesenho.
+- **Descartado na implementação:** `LayerVisual.Shadow`, que pintava a janela visual inteira de preto num `DesktopWindowTarget`.
+- Duas camadas de conteúdo: a antiga some enquanto a nova (já desenhada) aparece. Assim não há troca seca de texto.
 - O contorno é `StrokeBrush` + `StrokeThickness` na mesma shape, então anima junto.
 - O conteúdo some antes do morph (opacidade → 0, ~80 ms) e aparece depois (`DelayTime` ≈ tempo da mola). É simples e atende ao cenário "Conteúdo durante a transição".
 
@@ -53,11 +55,11 @@ ContainerVisual (raiz)
 - DPI: a superfície é desenhada em px físicos (escala do monitor). Em `relayout`, ela é redesenhada.
 
 ### D6 — Máquina de estados pura (`src/island.rs`)
-`Island { activity: Option<Activity>, expanded: bool, hover: bool }` com `fn on(&mut self, Event) -> Effects`. Os eventos são `MouseEnter`, `MouseLeave`, `Click`, `LeaveTimeout`, `ActivityStart`, `ActivityEnd` e `SessionLock`. `fn target(&self) -> Shape` devolve o estado visual (Idle/Compact/Expanded) e se há hover. Sem Win32, só testes unitários. A janela traduz mensagens em eventos e aplica `target()` no `Renderer` e na região.
+`Island { activity, revealed, expanded, hover }` com `fn on(&mut self, Event) -> Timer`. Os eventos são `MouseEnter`, `MouseLeave`, `Click`, `RevealTimeout`, `LeaveTimeout`, `ActivityStart`, `ActivityEnd` e `SessionLock`. `Timer` diz à janela o que fazer: iniciar o timer de revelar (150 ms), iniciar o de sair (1 s), pará-los, ou nada. `visual()` devolve Oculta/Idle/Compact/Expanded (Oculta = sem atividade e não revelada) e `shape()` devolve o tamanho de destino com hover. Sem Win32, só testes unitários. A janela traduz mensagens em eventos e aplica `target()` no `Renderer` e na região.
 
 ### D7 — Mouse sem hook global
 - Hover: `WM_MOUSEMOVE` na janela de entrada, com `TrackMouseEvent(TME_LEAVE)` → `WM_MOUSELEAVE`.
-- Recolher: `SetTimer` de disparo único (1 s) iniciado no `MouseLeave` e cancelado no `MouseEnter`. Quando dispara, chama `KillTimer`, então não sobra timer periódico.
+- Recolher/ocultar: `SetTimer` de disparo único (1 s) iniciado no `MouseLeave` (se Expanded, ou se revelada sem atividade) e cancelado no `MouseEnter`. No disparo, Expanded recolhe para Compact (com atividade) ou a ilha volta a Oculta (sem atividade). Em seguida chama `KillTimer`, então não sobra timer periódico.
 - "Clicar fora" é coberto pelo mesmo timer: para clicar fora, o cursor já saiu. Um hook global de mouse continua descartado (custo constante, risco com anti-cheat — Fase 1, D2).
 
 ### D8 — Redução de animações
@@ -79,11 +81,21 @@ Em `WTS_SESSION_LOCK` e `PBT_APMSUSPEND`, envia `SessionLock` à máquina (que l
 ### D11 — Menu Demo
 Fica sob `#[cfg(debug_assertions)]` em `show_tray_menu`, com os itens "Demo: iniciar atividade" e "Demo: encerrar". O texto placeholder fica fixo no código e não vai para o i18n, porque não chega ao usuário final.
 
+### D12 — Zona ativa no topo (revelar sem hook nem polling)
+- Enquanto a ilha está Oculta, a própria janela de entrada encolhe para a faixa de 2 px × largura do Idle, colada ao topo da área útil (y = topo da área útil, ignorando a margem). Não há janela nova: é só outro retângulo/região no `apply_shape`.
+- `WM_MOUSEMOVE` na faixa dispara `MouseEnter` → timer de disparo único de 150 ms (`Timer::StartReveal`). `WM_MOUSELEAVE` antes disso cancela. No disparo, `RevealTimeout` torna a ilha revelada e a janela de entrada passa a ser a cápsula Idle.
+- Oculta = a geometria vai para `Offset.Y = −(altura + folga)`, acima da borda superior da janela visual. A janela recorta o que fica fora dela, então a cápsula "sai da borda" com a mesma mola das outras transições.
+- **Alternativas:** hook global de mouse (descartado na Fase 1); polling de `GetCursorPos` com timer (viola "sem trabalho periódico"); `SHAppBarMessage`/barra de app auto-hide (reserva área de tela e só funciona colada à borda inteira). A faixa intercepta cliques nos seus 2 px; isso foi aceito pelo usuário.
+- `ponytail:` entre a faixa (y = 0–2 px) e a cápsula (y = 8 DIP) há um vão. O cursor atravessa o vão dentro da tolerância de 1 s, então não precisamos estender a área de entrada.
+- Com o app oculto pelo menu da bandeja, a faixa também some (janela de entrada oculta).
+
 ## Risks / Trade-offs
 
 - [D3D/D2D sobe a memória (~10–20 MB)] → criado só sob demanda; medir no benchmark; liberar em Idle se passar de 50 MB.
+- [Faixa de revelação bloqueia 2 px no topo central (ex.: borda superior de abas de navegador maximizado)] → faixa estreita (largura do Idle) e baixa (2 px); concessão aceita. Se incomodar: reduzir para 1 px ou tornar opcional nas configurações.
+- [Revelar acidentalmente ao mirar algo no topo] → exige permanência de 150 ms; passagem rápida não revela.
 - [Região de entrada adiantada em relação à forma (D2)] → é perceptível só em ~400 ms de expansão; marcado com `ponytail:`.
-- [`LayerVisual` + `DropShadow` exigem Windows 10 1803+] → o alvo é o Windows 11. Se `Shadow` falhar, segue sem sombra (log de aviso), porque o contorno garante o contraste.
+- [`CompositionVisualSurface` exige Windows 10 1903+] → o alvo é o Windows 11. Se `Shadow` falhar, segue sem sombra (log de aviso), porque o contorno garante o contraste.
 - [GPU híbrida / troca de GPU] → tratado por `RenderingDeviceReplaced` (D5); teste manual derrubando o driver (`Win+Ctrl+Shift+B`).
 - [A mola NaturalMotion não reporta quando terminou] → não precisamos disso (D1/D2). Se uma fase futura precisar, há `CompositionScopedBatch.Completed`.
 - [Sombra fora da janela visual cortada] → a folga da janela visual (D3) inclui blur + offset da sombra.
