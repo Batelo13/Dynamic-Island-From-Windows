@@ -23,17 +23,18 @@ Ambiente: i5-13420H, 24 GB, RTX 4050 Laptop + Intel UHD, Windows 11 Home 26200, 
 | Instância única: 2ª execução sai (código 0), segue 1 processo | manual por script | ✅ |
 | Sem elevação: executado em sessão não elevada, sem prompt de UAC | manual por script | ✅ |
 
-### Manuais pendentes
+### Manuais — 2026-11-26
 
-| Cenário | Status |
-|---|---|
-| Menu da bandeja: Ocultar/Mostrar/Sair, textos em pt-BR | ⏳ requer interação humana |
-| Mudança de escala (100% ↔ 150%) e de resolução com o app aberto | ⏳ requer alterar configurações de exibição |
-| Segundo monitor / monitor configurado desconectado | ⏳ só há um monitor disponível |
-| Barra de tarefas no topo (comportamento real) | ⏳ coberto só por teste unitário |
-| Suspensão/retomada e bloqueio/desbloqueio | ⏳ requer interação humana |
-| Janela maximizada por baixo continua coberta pela ilha | ⏳ |
-| Explorer reiniciado → ícone da bandeja volta (`TaskbarCreated`) | ⏳ |
+| Cenário | Como | Status |
+|---|---|---|
+| Menu da bandeja: "Ocultar ilha" ↔ "Mostrar ilha" (alterna) e "Sair", textos em pt-BR | usuário | ✅ |
+| Explorer reiniciado → ícone da bandeja volta (`TaskbarCreated`) | script reinicia o Explorer + usuário confirma o ícone | ✅ |
+| Mudança de escala 125% → 150% → 125% com o app aberto | usuário | ✅ |
+| Bloqueio/desbloqueio (Win+L) | usuário | ✅ |
+| Suspensão/retomada | usuário | ✅ |
+| Janela maximizada por baixo continua coberta pela ilha (hit-test no centro → ilha; abaixo → janela) | script | ✅ |
+| Segundo monitor / monitor configurado desconectado | — | ⏳ só há um monitor disponível (coberto por teste unitário) |
+| Barra de tarefas no topo (comportamento real) | — | ⏳ Windows 11 não permite barra no topo sem ferramentas externas (coberto por teste unitário) |
 
 ### Comparação visual (tarefa 5.4)
 

@@ -28,7 +28,7 @@
 
 - [x] 5.1 `cargo test` passando
 - [x] 5.2 `scripts/bench.ps1` e primeira medição em `docs/benchmarks.md` (10 min em repouso, hardware e build documentados)
-- [ ] 5.3 Checklist manual dos cenários das specs (DPI 100/125/150%, segundo monitor se disponível, barra no topo, suspensão, bloqueio, usuário padrão) registrado em `docs/testing.md` como aprovado/reprovado/não executado
+- [x] 5.3 Checklist manual dos cenários das specs (DPI 100/125/150%, segundo monitor se disponível, barra no topo, suspensão, bloqueio, usuário padrão) registrado em `docs/testing.md` como aprovado/reprovado/não executado
 - [x] 5.4 Screenshot da cápsula Idle comparada com as refs 1 e 2 (proporção e raio)
 - [x] 5.5 Gerar grafo inicial com Graphify
 - [x] 5.6 `openspec validate setup-foundation --strict`
