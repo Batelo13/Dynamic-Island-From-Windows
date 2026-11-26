@@ -15,13 +15,14 @@ use windows::{
     },
     Win32::{
         Foundation::{HANDLE, HMODULE, HWND, POINT},
+        System::LibraryLoader::{GetProcAddress, LoadLibraryW},
         Graphics::{
             Direct2D::{
                 Common::{D2D1_COLOR_F, D2D_RECT_F},
                 D2D1CreateDevice, ID2D1Device, ID2D1DeviceContext, D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_ELLIPSE, D2D1_ROUNDED_RECT,
             },
-            Direct3D::{D3D_DRIVER_TYPE, D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP},
-            Direct3D11::{D3D11CreateDevice, ID3D11Device, ID3D11Device4, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_SDK_VERSION},
+            Direct3D::{D3D_DRIVER_TYPE, D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP, D3D_FEATURE_LEVEL},
+            Direct3D11::{ID3D11Device, ID3D11Device4, D3D11_CREATE_DEVICE_BGRA_SUPPORT, D3D11_CREATE_DEVICE_FLAG, D3D11_SDK_VERSION},
             DirectWrite::{
                 DWriteCreateFactory, IDWriteFactory, IDWriteTextFormat, DWRITE_FACTORY_TYPE_SHARED, DWRITE_FONT_STRETCH_NORMAL,
                 DWRITE_FONT_STYLE_NORMAL, DWRITE_FONT_WEIGHT, DWRITE_FONT_WEIGHT_REGULAR, DWRITE_FONT_WEIGHT_SEMI_BOLD,
@@ -35,7 +36,7 @@ use windows::{
             CreateDispatcherQueueController, DispatcherQueueOptions, DQTAT_COM_STA, DQTYPE_THREAD_CURRENT,
         },
     },
-    core::{h, Interface, Result, HSTRING, PCWSTR},
+    core::{h, s, w, Interface, Result, HRESULT, HSTRING, PCWSTR},
 };
 use windows_numerics::{Vector2, Vector3};
 
@@ -276,10 +277,34 @@ impl Renderer {
     }
 }
 
+/// `D3D11CreateDevice` resolved at runtime: a static import loads dxgi.dll at startup, which reserves
+/// ~54 MB of private commit as soon as the thread creates a window — even if no device is ever made.
+/// ponytail: once a device exists the reservation stays for the process lifetime (unloading doesn't return it);
+/// it is untouched commit, not RAM — the private working set stays small.
+type D3D11CreateDeviceFn = unsafe extern "system" fn(
+    adapter: *mut core::ffi::c_void,
+    driver: D3D_DRIVER_TYPE,
+    software: HMODULE,
+    flags: D3D11_CREATE_DEVICE_FLAG,
+    levels: *const D3D_FEATURE_LEVEL,
+    level_count: u32,
+    sdk: u32,
+    device: *mut Option<ID3D11Device>,
+    level: *mut D3D_FEATURE_LEVEL,
+    context: *mut *mut core::ffi::c_void,
+) -> HRESULT;
+
 fn create_device() -> Result<(ID3D11Device, ID2D1Device)> {
+    let create: D3D11CreateDeviceFn = unsafe {
+        let module = LoadLibraryW(w!("d3d11.dll"))?;
+        let proc = GetProcAddress(module, s!("D3D11CreateDevice")).ok_or_else(windows::core::Error::from_thread)?;
+        std::mem::transmute::<unsafe extern "system" fn() -> isize, D3D11CreateDeviceFn>(proc)
+    };
     let make = |driver: D3D_DRIVER_TYPE| -> Result<ID3D11Device> {
         let mut device = None;
-        unsafe { D3D11CreateDevice(None, driver, HMODULE::default(), D3D11_CREATE_DEVICE_BGRA_SUPPORT, None, D3D11_SDK_VERSION, Some(&mut device), None, None)? };
+        let flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
+        let null = std::ptr::null_mut();
+        unsafe { create(null, driver, HMODULE::default(), flags, std::ptr::null(), 0, D3D11_SDK_VERSION, &mut device, null.cast(), null.cast()).ok()? };
         device.ok_or_else(|| windows::core::Error::from_hresult(windows::Win32::Foundation::E_FAIL))
     };
     let d3d = make(D3D_DRIVER_TYPE_HARDWARE).or_else(|_| make(D3D_DRIVER_TYPE_WARP))?;
