@@ -1,10 +1,12 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod i18n;
+mod island;
 mod layout;
 mod log;
 mod render;
 mod settings;
+mod theme;
 mod window;
 
 use std::time::Instant;

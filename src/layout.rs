@@ -1,9 +1,6 @@
 //! Pure placement math (physical pixels). No Win32 calls here so it stays testable.
 
-pub const CAPSULE_W_DIP: f32 = 126.0;
-pub const CAPSULE_H_DIP: f32 = 37.0;
-/// Extra room around the capsule inside the click-through visual window (future shadow/expansion).
-pub const VISUAL_PAD_DIP: f32 = 16.0;
+use crate::theme::{self, ShapeSize};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 pub struct Rect {
@@ -41,24 +38,40 @@ pub fn pick<'a>(monitors: &'a [Monitor], wanted: Option<&str>) -> Option<&'a Mon
         .or(monitors.first())
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Placement {
-    /// Capsule in screen coordinates (input window).
-    pub capsule: Rect,
-    /// Visual window in screen coordinates; capsule sits at offset `pad` inside it.
+    /// Visual window in screen coordinates: fixed, sized for the largest shape + shadow (design.md D3).
     pub visual: Rect,
-    pub pad: i32,
+    /// Horizontal center and top edge every shape is anchored to (screen px).
+    pub center_x: i32,
+    pub top: i32,
+    pub scale: f32,
+}
+
+impl Placement {
+    pub fn px(&self, dip: f32) -> i32 {
+        (dip * self.scale).round() as i32
+    }
+
+    /// Screen rect of a shape anchored at the top center.
+    pub fn shape(&self, s: ShapeSize) -> Rect {
+        let (w, h) = (self.px(s.w), self.px(s.h));
+        let left = self.center_x - w / 2;
+        Rect { left, top: self.top, right: left + w, bottom: self.top + h }
+    }
 }
 
 pub fn place(work: Rect, dpi: u32, top_margin_dip: f32) -> Placement {
     let scale = dpi as f32 / 96.0;
     let px = |dip: f32| (dip * scale).round() as i32;
-    let (w, h) = (px(CAPSULE_W_DIP), px(CAPSULE_H_DIP));
-    let left = work.left + (work.width() - w) / 2;
+    // Center derived from the Idle capsule so its position stays identical to Phase 1.
+    let idle_w = px(theme::IDLE.w);
+    let center_x = work.left + (work.width() - idle_w) / 2 + idle_w / 2;
     let top = work.top + px(top_margin_dip);
-    let capsule = Rect { left, top, right: left + w, bottom: top + h };
-    let pad = px(VISUAL_PAD_DIP);
-    Placement { capsule, visual: capsule.inflate(pad), pad }
+    let (max_w, pad) = (px(theme::MAX_W), px(theme::SHADOW_PAD_DIP));
+    let left = center_x - max_w / 2;
+    let visual = Rect { left, top, right: left + max_w, bottom: top + px(theme::MAX_H) }.inflate(pad);
+    Placement { visual, center_x, top, scale }
 }
 
 #[cfg(test)]
@@ -72,16 +85,20 @@ mod tests {
     #[test]
     fn centered_with_margin_at_100_percent() {
         let p = place(r(0, 0, 1920, 1040), 96, 8.0);
-        assert_eq!(p.capsule, r(897, 8, 1023, 45));
-        assert_eq!(p.visual, r(881, -8, 1039, 61));
+        assert_eq!(p.shape(theme::IDLE), r(897, 8, 1023, 45));
+        assert_eq!(p.visual, r(780 - 16, 8 - 16, 1140 + 16, 168 + 16));
+        // Every state shares the top edge and center.
+        let e = p.shape(theme::EXPANDED);
+        assert_eq!((e.top, (e.left + e.right) / 2), (8, 960));
     }
 
     #[test]
     fn scales_at_150_percent() {
         let p = place(r(0, 0, 2880, 1680), 144, 8.0);
-        assert_eq!((p.capsule.width(), p.capsule.height()), (189, 56));
-        assert_eq!(p.capsule.top, 12);
-        let center = (p.capsule.left + p.capsule.right) / 2;
+        let c = p.shape(theme::IDLE);
+        assert_eq!((c.width(), c.height()), (189, 56));
+        assert_eq!(c.top, 12);
+        let center = (c.left + c.right) / 2;
         assert!((center - 1440).abs() <= 1);
     }
 
@@ -89,8 +106,9 @@ mod tests {
     fn respects_work_area_offset_top_taskbar_and_second_monitor() {
         // Second monitor to the right, taskbar docked at the top (work starts at y=48).
         let p = place(r(1920, 48, 3840, 1080), 96, 0.0);
-        assert_eq!(p.capsule.top, 48);
-        assert_eq!((p.capsule.left + p.capsule.right) / 2, 2880);
+        let c = p.shape(theme::IDLE);
+        assert_eq!(c.top, 48);
+        assert_eq!((c.left + c.right) / 2, 2880);
     }
 
     #[test]

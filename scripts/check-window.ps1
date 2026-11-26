@@ -1,9 +1,11 @@
-# Automated check of island-window behavior: click-through, hit area, focus, Alt+Tab/taskbar styles.
+﻿# Automated check of island-window behavior: click-through, hit area, focus, Alt+Tab/taskbar styles.
 # Usage: powershell -ExecutionPolicy Bypass -File scripts\check-window.ps1 [-Exe target\release\dynamic-island.exe] [-Shot out.png]
 # Moves the mouse and clicks briefly over a test form it creates; restores the cursor afterwards.
 param(
     [string]$Exe = "$PSScriptRoot\..\target\release\dynamic-island.exe",
-    [string]$Shot = ""
+    [string]$Shot = "",
+    # Debug builds only: start the tray Demo activity, click to expand, check click-through around Expanded.
+    [switch]$Demo
 )
 $ErrorActionPreference = 'Stop'
 Add-Type -AssemblyName System.Windows.Forms, System.Drawing
@@ -23,6 +25,7 @@ public static class W {
   [DllImport("user32.dll")] public static extern void mouse_event(uint f, int x, int y, uint d, IntPtr e);
   [DllImport("user32.dll")] public static extern int GetWindowLong(IntPtr h, int i);
   [DllImport("user32.dll")] public static extern bool SetProcessDpiAwarenessContext(IntPtr c);
+  [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, uint m, IntPtr w, IntPtr l);
   public static IntPtr At(int x, int y) { var p = new POINT{X=x,Y=y}; return GetAncestor(WindowFromPoint(p), 2); }
   public static void Click(int x, int y) { SetCursorPos(x, y); mouse_event(2,0,0,0,IntPtr.Zero); mouse_event(4,0,0,0,IntPtr.Zero); }
 }
@@ -39,10 +42,12 @@ $work = [System.Windows.Forms.Screen]::PrimaryScreen.WorkingArea
 # Test target covering the top-center of the primary work area.
 $form = New-Object System.Windows.Forms.Form
 $form.FormBorderStyle = 'None'; $form.StartPosition = 'Manual'; $form.BackColor = 'White'; $form.ShowInTaskbar = $false
-$form.Bounds = New-Object System.Drawing.Rectangle(($work.X + $work.Width / 2 - 400), $work.Y, 800, 200)
+# Briefly topmost so it lands above any maximized app (focus-steal prevention), then back to the normal band
+# so the island (topmost) stays above it even after the form takes the foreground.
+$form.Bounds = New-Object System.Drawing.Rectangle(($work.X + $work.Width / 2 - 400), $work.Y, 800, 320)
 $script:clicks = 0
 $form.Add_MouseClick({ $script:clicks++ })
-$form.Show(); Pump 300
+$form.TopMost = $true; $form.Show(); Pump 300; $form.TopMost = $false; Pump 100
 
 $t0 = Get-Date
 $app = Start-Process -FilePath $Exe -PassThru
@@ -68,6 +73,7 @@ Check 'hit-test inside capsule -> island' ([W]::At($cx, $cy) -eq $inp)
 Check 'hit-test 2px left of capsule -> window below' ([W]::At($r.L - 2, $cy) -eq $formH)
 Check 'hit-test 2px above capsule (visual pad) -> window below' ([W]::At($cx, $r.T - 2) -eq $formH)
 Check 'hit-test rounded corner (outside shape) -> window below' ([W]::At($r.L + 2, $r.T + 2) -eq $formH)
+Check 'hit-test on shadow below capsule -> window below' ([W]::At($cx, $r.B + 4) -eq $formH)
 
 $saved = New-Object W+POINT; [void][W]::GetCursorPos([ref]$saved)
 [void][W]::SetForegroundWindow($formH); Pump 200
@@ -78,9 +84,26 @@ $before = $script:clicks
 Check 'real click 2px outside reaches window below' ($script:clicks -eq $before + 1)
 
 $before = $script:clicks
+$fg = [W]::GetForegroundWindow()  # after the outside click, which legitimately activates the form
 [W]::Click($cx, $cy); Pump 300
 Check 'real click inside does not reach window below' ($script:clicks -eq $before)
 Check 'focus unchanged after clicking capsule' ([W]::GetForegroundWindow() -eq $fg)
+if ($Demo) {
+    # Tray menu (WM_APP+1 / WM_RBUTTONUP) -> 2nd item "Demo: iniciar atividade"; then click to expand.
+    $hostWnd = [W]::FindWindow('DynamicIslandWindow', 'Dynamic Island Host')
+    [void][W]::PostMessage($hostWnd, 0x8001, [IntPtr]1, [IntPtr]0x0205); Pump 400
+    [System.Windows.Forms.SendKeys]::SendWait('{DOWN}{DOWN}{ENTER}'); Pump 300
+    [void][W]::GetWindowRect($inp, [ref]$r); $cx = [int](($r.L + $r.R) / 2); $cy = [int](($r.T + $r.B) / 2)
+    [void][W]::SetForegroundWindow($formH); Pump 200; $fg = [W]::GetForegroundWindow()
+    [W]::Click($cx, $cy); Pump 500
+    $e = New-Object W+RECT; [void][W]::GetWindowRect($inp, [ref]$e)
+    Check 'demo: click expands' (($e.B - $e.T) -gt 3 * ($r.B - $r.T)) ("{0}x{1}" -f ($e.R - $e.L), ($e.B - $e.T))
+    $ex = [int](($e.L + $e.R) / 2)
+    Check 'expanded: 2px below shape -> window below' ([W]::At($ex, $e.B + 2) -eq $formH)
+    Check 'expanded: on shadow below -> window below' ([W]::At($ex, $e.B + 8) -eq $formH)
+    Check 'expanded: inside -> island' ([W]::At($ex, $e.B - 10) -eq $inp)
+    Check 'expanded: focus unchanged' ([W]::GetForegroundWindow() -eq $fg)
+}
 [void][W]::SetCursorPos($saved.X, $saved.Y)
 
 if ($Shot) {

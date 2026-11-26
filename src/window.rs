@@ -1,16 +1,28 @@
 //! Windows of the island (design.md D2/D3):
 //! - host:   hidden top-level window; system broadcasts + tray owner (can take foreground for the tray menu).
 //! - visual: click-through composition surface, never receives mouse input.
-//! - input:  invisible (alpha 1) window clipped to the capsule shape; receives clicks, never activates.
-use crate::{i18n::{t, Text}, layout, log, render::Renderer, settings::{self, Settings}};
+//! - input:  invisible (alpha 1) window clipped to the island shape; receives mouse input, never activates.
+use crate::{
+    i18n::{t, Text},
+    island::{self, Event, Island},
+    layout, log,
+    render::{Frame, Renderer},
+    settings::{self, Settings},
+    theme,
+};
 use std::{cell::RefCell, path::PathBuf, time::Instant};
 use windows::{
     Win32::{
-        Foundation::{COLORREF, HWND, LPARAM, LRESULT, POINT, RECT, WPARAM, TRUE},
+        Foundation::{COLORREF, HANDLE, HWND, LPARAM, LRESULT, POINT, RECT, TRUE, WPARAM},
         Graphics::Gdi::{CreateRoundRectRgn, EnumDisplayMonitors, GetMonitorInfoW, GetStockObject, SetWindowRgn, BLACK_BRUSH, HBRUSH, HDC, HMONITOR, MONITORINFO, MONITORINFOEXW},
-        System::{LibraryLoader::GetModuleHandleW, RemoteDesktop::{WTSRegisterSessionNotification, WTSUnRegisterSessionNotification, NOTIFY_FOR_THIS_SESSION}},
+        System::{
+            LibraryLoader::GetModuleHandleW,
+            RemoteDesktop::{WTSRegisterSessionNotification, WTSUnRegisterSessionNotification, NOTIFY_FOR_THIS_SESSION},
+            Threading::{RegisterWaitForSingleObject, INFINITE, WT_EXECUTEONLYONCE},
+        },
         UI::{
             HiDpi::{GetDpiForMonitor, MDT_EFFECTIVE_DPI},
+            Input::KeyboardAndMouse::{TrackMouseEvent, TME_LEAVE, TRACKMOUSEEVENT},
             Shell::{Shell_NotifyIconW, NIF_ICON, NIF_MESSAGE, NIF_TIP, NIM_ADD, NIM_DELETE, NOTIFYICONDATAW},
             WindowsAndMessaging::*,
         },
@@ -20,10 +32,19 @@ use windows::{
 
 const WM_TRAY: u32 = WM_APP + 1;
 const WM_RELAYOUT: u32 = WM_APP + 2;
+const WM_DEVICE_LOST: u32 = WM_APP + 3;
 const ID_TOGGLE: usize = 1;
 const ID_QUIT: usize = 2;
+#[cfg(debug_assertions)]
+const ID_DEMO_START: usize = 3;
+#[cfg(debug_assertions)]
+const ID_DEMO_END: usize = 4;
+const TIMER_COLLAPSE: usize = 1;
+const WM_MOUSELEAVE: u32 = 0x02A3;
 const MONITORINFOF_PRIMARY: u32 = 1;
+const WTS_SESSION_LOCK: usize = 0x7;
 const WTS_SESSION_UNLOCK: usize = 0x8;
+const PBT_APMSUSPEND: usize = 0x4;
 const PBT_APMRESUMEAUTOMATIC: usize = 0x12;
 
 struct App {
@@ -35,6 +56,13 @@ struct App {
     settings_path: PathBuf,
     taskbar_created: u32,
     startup: Option<Instant>,
+    island: Island,
+    placement: Option<layout::Placement>,
+    dpi: u32,
+    /// Windows "Animation effects" (design.md D8).
+    animations: bool,
+    /// TrackMouseEvent armed (cursor inside the input window).
+    hovering: bool,
 }
 
 thread_local! {
@@ -81,6 +109,11 @@ pub fn create(startup: Instant) -> Result<()> {
         settings_path,
         taskbar_created: unsafe { RegisterWindowMessageW(w!("TaskbarCreated")) },
         startup: Some(startup),
+        island: Island::default(),
+        placement: None,
+        dpi: 96,
+        animations: animations_enabled(),
+        hovering: false,
     };
     app.add_tray_icon();
     APP.with(|a| *a.borrow_mut() = Some(app));
@@ -107,22 +140,85 @@ impl App {
             return;
         };
         let p = layout::place(mon.work, mon.dpi, self.settings.top_margin);
-        let (v, c) = (p.visual, p.capsule);
-        let flags = SWP_NOACTIVATE | SWP_NOOWNERZORDER;
+        let v = p.visual;
         let result = (|| -> Result<()> {
-            unsafe {
-                SetWindowPos(self.visual, Some(HWND_TOPMOST), v.left, v.top, v.width(), v.height(), flags)?;
-                SetWindowPos(self.input, Some(HWND_TOPMOST), c.left, c.top, c.width(), c.height(), flags)?;
-                // Region coords are window-relative; +1 because GDI excludes right/bottom edges.
-                let rgn = CreateRoundRectRgn(0, 0, c.width() + 1, c.height() + 1, c.height(), c.height());
-                SetWindowRgn(self.input, Some(rgn), true); // system owns rgn after this call
-            }
-            self.renderer.set_capsule(v.width() as f32, v.height() as f32, p.pad as f32, c.width() as f32, c.height() as f32)
+            unsafe { SetWindowPos(self.visual, Some(HWND_TOPMOST), v.left, v.top, v.width(), v.height(), SWP_NOACTIVATE | SWP_NOOWNERZORDER)? };
+            self.renderer.set_window(v.width() as f32, v.height() as f32, p.scale)
         })();
         if let Err(e) = result {
             log::error(&format!("relayout failed: {e}"));
         }
+        self.placement = Some(p);
+        self.dpi = mon.dpi;
+        self.apply_shape(false);
         self.apply_visibility();
+    }
+
+    /// Push the island's target shape to the input window (region = destination, design.md D2) and renderer.
+    fn apply_shape(&mut self, animate: bool) {
+        let Some(p) = self.placement else { return };
+        let size = self.island.shape();
+        let c = p.shape(size);
+        let radius = p.px(size.radius);
+        let v = p.visual;
+        let frame = Frame {
+            x: (c.left - v.left) as f32,
+            y: (c.top - v.top) as f32,
+            w: c.width() as f32,
+            h: c.height() as f32,
+            radius: radius as f32,
+        };
+        let result = (|| -> Result<()> {
+            unsafe {
+                // ponytail: region jumps to the target shape; ~400 ms mismatch while the spring runs.
+                // Upgrade: sample the spring in-process during transitions if phantom clicks show up.
+                SetWindowPos(self.input, Some(HWND_TOPMOST), c.left, c.top, c.width(), c.height(), SWP_NOACTIVATE | SWP_NOOWNERZORDER)?;
+                // Region coords are window-relative; +1 because GDI excludes right/bottom edges.
+                let rgn = CreateRoundRectRgn(0, 0, c.width() + 1, c.height() + 1, radius * 2, radius * 2);
+                SetWindowRgn(self.input, Some(rgn), true); // system owns rgn after this call
+            }
+            self.renderer.apply(frame, self.island.visual(), self.dpi, animate && self.animations)
+        })();
+        if let Err(e) = result {
+            log::error(&format!("apply shape failed: {e}"));
+        }
+        self.watch_device();
+    }
+
+    fn send(&mut self, event: Event, animate: bool) {
+        match self.island.on(event) {
+            island::Timer::Start => unsafe {
+                SetTimer(Some(self.host), TIMER_COLLAPSE, theme::COLLAPSE_AFTER_LEAVE_MS, None);
+            },
+            island::Timer::Stop => unsafe {
+                let _ = KillTimer(Some(self.host), TIMER_COLLAPSE);
+            },
+            island::Timer::Keep => {}
+        }
+        self.apply_shape(animate);
+    }
+
+    fn mouse_move(&mut self) {
+        if self.hovering {
+            return;
+        }
+        self.hovering = true;
+        let mut tme = TRACKMOUSEEVENT { cbSize: size_of::<TRACKMOUSEEVENT>() as u32, dwFlags: TME_LEAVE, hwndTrack: self.input, dwHoverTime: 0 };
+        let _ = unsafe { TrackMouseEvent(&mut tme) };
+        self.send(Event::MouseEnter, true);
+    }
+
+    /// Wait (thread pool, no polling) on the D3D device-removed event whenever a new device was created.
+    fn watch_device(&mut self) {
+        let Some(event) = self.renderer.device_removed.take() else { return };
+        unsafe extern "system" fn on_removed(ctx: *mut core::ffi::c_void, _: bool) {
+            let _ = unsafe { PostMessageW(Some(HWND(ctx)), WM_DEVICE_LOST, WPARAM(0), LPARAM(0)) };
+        }
+        let mut wait = HANDLE::default();
+        // ponytail: one-shot waits are never unregistered (one tiny handle per device loss, a rare event).
+        if let Err(e) = unsafe { RegisterWaitForSingleObject(&mut wait, event, Some(on_removed), Some(self.host.0), INFINITE, WT_EXECUTEONLYONCE) } {
+            log::warn(&format!("device-removed watch unavailable: {e}"));
+        }
     }
 
     fn apply_visibility(&mut self) {
@@ -166,6 +262,12 @@ impl App {
             let wide = |s: &str| s.encode_utf16().chain([0]).collect::<Vec<u16>>();
             let (a, b) = (wide(toggle), wide(t(Text::Quit)));
             let _ = AppendMenuW(menu, MF_STRING, ID_TOGGLE, PCWSTR(a.as_ptr()));
+            // Dev-only placeholder activity (design.md D11); not localized, never in release builds.
+            #[cfg(debug_assertions)]
+            {
+                let _ = AppendMenuW(menu, MF_STRING, ID_DEMO_START, w!("Demo: iniciar atividade"));
+                let _ = AppendMenuW(menu, MF_STRING, ID_DEMO_END, w!("Demo: encerrar"));
+            }
             let _ = AppendMenuW(menu, MF_STRING, ID_QUIT, PCWSTR(b.as_ptr()));
             let mut pt = POINT::default();
             let _ = GetCursorPos(&mut pt);
@@ -183,6 +285,10 @@ impl App {
                 }
                 self.apply_visibility();
             }
+            #[cfg(debug_assertions)]
+            ID_DEMO_START => self.send(Event::ActivityStart, true),
+            #[cfg(debug_assertions)]
+            ID_DEMO_END => self.send(Event::ActivityEnd, true),
             ID_QUIT => unsafe {
                 let _ = Shell_NotifyIconW(NIM_DELETE, &self.tray_data());
                 let _ = WTSUnRegisterSessionNotification(self.host);
@@ -218,6 +324,12 @@ fn enum_monitors() -> Vec<layout::Monitor> {
     out
 }
 
+fn animations_enabled() -> bool {
+    let mut on = TRUE;
+    let ok = unsafe { SystemParametersInfoW(SPI_GETCLIENTAREAANIMATION, 0, Some(&mut on as *mut BOOL as *mut _), SYSTEM_PARAMETERS_INFO_UPDATE_FLAGS(0)) };
+    ok.is_err() || on.as_bool() // unknown → animate
+}
+
 fn request_relayout(hwnd: HWND) {
     // Deferred: avoids re-entrancy and coalesces bursts of display messages.
     unsafe {
@@ -228,14 +340,39 @@ fn request_relayout(hwnd: HWND) {
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_MOUSEACTIVATE => return LRESULT(MA_NOACTIVATE as isize),
-        WM_LBUTTONUP => {
-            #[cfg(debug_assertions)]
-            log::info("capsule click");
+        WM_MOUSEMOVE => with_app(|app| app.mouse_move()),
+        WM_MOUSELEAVE => with_app(|app| {
+            app.hovering = false;
+            app.send(Event::MouseLeave, true);
+        }),
+        WM_LBUTTONUP => with_app(|app| app.send(Event::Click, true)),
+        WM_TIMER if wparam.0 == TIMER_COLLAPSE => {
+            with_app(|app| {
+                let _ = unsafe { KillTimer(Some(app.host), TIMER_COLLAPSE) }; // one-shot: no periodic timer left
+                app.send(Event::LeaveTimeout, true);
+            });
+            return LRESULT(0);
         }
         WM_DISPLAYCHANGE | WM_DPICHANGED => request_relayout(hwnd),
-        WM_SETTINGCHANGE if wparam.0 as u32 == SPI_SETWORKAREA.0 => request_relayout(hwnd),
+        WM_SETTINGCHANGE => {
+            with_app(|app| app.animations = animations_enabled());
+            if wparam.0 as u32 == SPI_SETWORKAREA.0 {
+                request_relayout(hwnd);
+            }
+        }
+        WM_POWERBROADCAST if wparam.0 == PBT_APMSUSPEND => with_app(|app| app.send(Event::SessionLock, false)),
         WM_POWERBROADCAST if wparam.0 == PBT_APMRESUMEAUTOMATIC => request_relayout(hwnd),
+        WM_WTSSESSION_CHANGE if wparam.0 == WTS_SESSION_LOCK => with_app(|app| app.send(Event::SessionLock, false)),
         WM_WTSSESSION_CHANGE if wparam.0 == WTS_SESSION_UNLOCK => request_relayout(hwnd),
+        WM_DEVICE_LOST => {
+            with_app(|app| {
+                if let Err(e) = app.renderer.recover_device() {
+                    log::error(&format!("device recovery failed: {e}"));
+                }
+                app.apply_shape(false);
+            });
+            return LRESULT(0);
+        }
         WM_RELAYOUT => {
             // Drop queued duplicates so a burst produces one relayout.
             let mut m = MSG::default();
