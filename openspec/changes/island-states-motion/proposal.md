@@ -9,6 +9,7 @@ A Fase 1 entregou só a cápsula Idle estática. Para virar uma Dynamic Island d
   - **Idle**: 126 × 37 DIP.
   - **Compact**: pílula larga, com um slot à esquerda para ícone e um à direita para informação.
   - **Expanded**: retângulo arredondado grande, raio ~32 DIP.
+- Auto-ocultar: sem atividade a ilha fica oculta. Ela aparece quando o cursor para por um instante no centro superior da tela e enquanto houver atividade (notificação, música, cronômetro; nesta fase, o demo).
 - Morph por mola entre estados (tamanho, raio e posição). A transição pode ser interrompida a qualquer momento, sem saltos, e não há trabalho periódico depois que a forma assenta.
 - Interação com o mouse:
   - hover dá um leve crescimento;

@@ -91,7 +91,11 @@ Fica sob `#[cfg(debug_assertions)]` em `show_tray_menu`, com os itens "Demo: ini
 
 ## Risks / Trade-offs
 
-- [D3D/D2D sobe a memória (~10–20 MB)] → criado só sob demanda; medir no benchmark; liberar em Idle se passar de 50 MB.
+- [D3D/D2D sobe a memória] → **medido (2026-11-26):**
+  - `D3D11CreateDevice` importado estaticamente carregava o `dxgi.dll` na inicialização, e o `dxgi` reserva ~54 MB de commit privado assim que a thread cria uma janela (Idle passou de 2,9 para 56,5 MB).
+  - Correção: resolver `D3D11CreateDevice` com `LoadLibrary`/`GetProcAddress` só no primeiro texto. Idle volta a 3,0 MB de commit e 1,6 MB de RAM.
+  - Com texto, o commit vai a 60–114 MB e **não volta**, nem liberando o dispositivo nem descarregando a DLL (testado). A RAM real (conjunto de trabalho privado) fica em ~39 MB.
+  - Decisão do usuário: a meta de 50 MB passa a valer para o conjunto de trabalho privado; o commit fica registrado só como informação. Por isso não liberamos o dispositivo em Idle: não devolve nada.
 - [Faixa de revelação bloqueia 2 px no topo central (ex.: borda superior de abas de navegador maximizado)] → faixa estreita (largura do Idle) e baixa (2 px); concessão aceita. Se incomodar: reduzir para 1 px ou tornar opcional nas configurações.
 - [Revelar acidentalmente ao mirar algo no topo] → exige permanência de 150 ms; passagem rápida não revela.
 - [Região de entrada adiantada em relação à forma (D2)] → é perceptível só em ~400 ms de expansão; marcado com `ponytail:`.

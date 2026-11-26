@@ -116,7 +116,7 @@ O sistema SHALL executar trabalho apenas durante transições. Depois que a form
 
 #### Scenario: Após assentar
 - **WHEN** a ilha assenta em qualquer estado e não há interação por 10 minutos
-- **THEN** o consumo médio fica abaixo de 0,5% de CPU e 50 MB de memória privada, medido pelo roteiro de benchmark
+- **THEN** o consumo médio fica abaixo de 0,5% de CPU e 50 MB de conjunto de trabalho privado, medido pelo roteiro de benchmark
 
 #### Scenario: Durante transições
 - **WHEN** o roteiro de benchmark força transições contínuas por 30 s

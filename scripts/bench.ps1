@@ -70,12 +70,14 @@ if ($Transitions) {
 Start-Sleep -Seconds 2   # let everything settle; not counted as idle
 $p.Refresh()
 $cpu0 = $p.TotalProcessorTime; $t0 = Get-Date
-$priv = @(); $ws = @()
+$priv = @(); $ws = @(); $pws = @()
 while (((Get-Date) - $t0).TotalMinutes -lt $Minutes) {
     Start-Sleep -Seconds 5
     $p.Refresh()
     $priv += $p.PrivateMemorySize64 / 1MB
     $ws += $p.WorkingSet64 / 1MB
+    # Private working set = Task Manager 'Memory' column; the spec target (< 50 MB) applies to this one.
+    $pws += (Get-CimInstance Win32_PerfFormattedData_PerfProc_Process -Filter "IDProcess=$($p.Id)").WorkingSetPrivate / 1MB
 }
 $p.Refresh()
 $wall = ((Get-Date) - $t0).TotalSeconds
@@ -88,9 +90,9 @@ $os = (Get-CimInstance Win32_OperatingSystem)
 $size = "{0:N0} KB" -f ((Get-Item $Exe).Length / 1KB)
 $state = if ($Demo) { 'Compact (D3D/texto carregados)' } else { 'Idle' }
 @"
-| Data | Estado | Duração | Private (MB) | Working set (MB) | CPU média | Binário |
-|---|---|---|---|---|---|---|
-| $(Get-Date -Format 'yyyy-MM-dd HH:mm') | $state | $Minutes min | $(& $stats $priv) | $(& $stats $ws) | $("{0:N3}" -f $cpuPct)% de $cores threads | $size |
+| Data | Estado | Duração | RAM privada (MB, meta < 50) | Commit privado (MB) | Working set (MB) | CPU média | Binário |
+|---|---|---|---|---|---|---|---|
+| $(Get-Date -Format 'yyyy-MM-dd HH:mm') | $state | $Minutes min | $(& $stats $pws) | $(& $stats $priv) | $(& $stats $ws) | $("{0:N3}" -f $cpuPct)% de $cores threads | $size |
 
 Ambiente: $cpuName, $([math]::Round($os.TotalVisibleMemorySize / 1MB, 1)) GB, $($os.Caption) build $($os.BuildNumber).
 "@

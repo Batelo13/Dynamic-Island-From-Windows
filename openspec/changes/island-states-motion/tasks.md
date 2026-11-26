@@ -29,7 +29,7 @@
 ## 5. Validação
 
 - [x] 5.1 `cargo test`, `cargo clippy --all-targets` limpos
-- [ ] 5.2 Benchmark em repouso 10 min, depois de passar por Compact/Expanded (dispositivo D3D criado), registrado em `docs/benchmarks.md`; se > 50 MB, liberar dispositivo em Idle (D5)
+- [ ] 5.2 Benchmark em repouso 10 min, depois de passar por Compact/Expanded (dispositivo D3D criado), registrado em `docs/benchmarks.md` (conjunto de trabalho privado < 50 MB; commit como informação, ver Riscos do design)
 - [ ] 5.3 Benchmark de transições contínuas por 30 s (CPU média + retorno ao repouso em ≤ 2 s) em `docs/benchmarks.md`
 - [ ] 5.4 Manual: interrupção da mola sem salto, assentamento ≤ 600 ms, animações desligadas → instantâneo, Win+L com Expanded, troca de escala com texto, `Win+Ctrl+Shift+B` (perda de dispositivo), foco inalterado ao clicar — em `docs/testing.md`
 - [ ] 5.5 Screenshots dos 3 estados sobre fundo claro e escuro comparados com as refs 1, 2, 4 e 5; ajustar tokens
