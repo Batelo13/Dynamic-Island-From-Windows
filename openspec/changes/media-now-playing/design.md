@@ -74,6 +74,12 @@ Motivação e escopo: `proposal.md`. Requisitos: `specs/media-playback` e `specs
 - O conteúdo é redesenhado quando muda (estado, atividade, DPI, `faixa`, `tocando`).
 - `faixa` = título + artista + ponteiro da capa. Assim as barrinhas e o progresso não forçam redesenho das superfícies: eles vivem em visuais próprios, posicionados por estado.
 
+### D7 — Texto rasterizado por WARP, não pela GPU (decidido na implementação)
+- O que aconteceu: um processo do app (build de debug) ficou preso a 98% de um núcleo e deixou de responder. O gdb mostrou a thread principal girando dentro do driver de vídeo da Intel (`dcomp.dll` → `d3d11.dll` → `igd10um64xe.dll`). O gatilho exato não ficou provado: a pilha das nossas chamadas não chegou a ser lida.
+- Decisão: `create_device` tenta primeiro `D3D_DRIVER_TYPE_WARP` (rasterizador por CPU) e só depois o hardware. Só desenhamos superfícies pequenas (≤ 450×200 px), no máximo 1×/s; a composição e as animações continuam na GPU, dentro do DWM.
+- Medido (build profiling, Expanded de música aberto): nenhum driver de GPU no processo, RAM privada 10,2 MB (era ~39 MB), commit 17,2 MB (era 60–114 MB), CPU ~0,9% só enquanto o Expanded está aberto (tempos a cada 1 s). Checagens de janela: 27/27.
+- **Alternativa:** manter o hardware e investigar o gatilho. Isso exigiria reproduzir um travamento raro de driver de terceiros, sem garantia; o WARP remove o componente que falhou e ainda reduz a memória.
+
 ## Risks / Trade-offs
 
 - [Players que não publicam sessão (alguns apps antigos)] → não aparecem; limitação do Windows, documentada.

@@ -65,7 +65,7 @@ $away = @(($work.X + 40), ($work.Y + 500))
 [void][W]::SetCursorPos($away[0], $away[1]); Pump 300
 
 # Hidden on start (no activity): the input window is only the top-center reveal strip.
-$r = InRect; $cx = [int](($r.L + $r.R) / 2)
+$r = InRect; $cx = [int](($r.L + $r.R) / 2); $idleW = $r.R - $r.L  # the strip spans the Idle width
 Check 'hidden on start: input is the reveal strip' ((($r.B - $r.T) -le 3) -and ($r.T -eq $work.Y)) (Size $r)
 Check 'strip centered in work area (±1px)' ([math]::Abs($cx - ($work.X + $work.Width / 2)) -le 1) "center x=$cx"
 Check 'strip -> island' ([W]::At($cx, $r.T) -eq $inp)
@@ -120,7 +120,7 @@ if ($Demo) {
     [void][W]::PostMessage($hostWnd, 0x8001, [IntPtr]1, [IntPtr]0x0205); Pump 400
     [System.Windows.Forms.SendKeys]::SendWait('{DOWN}{DOWN}{ENTER}'); Pump 600
     $c = InRect
-    Check 'demo: activity shows Compact without gesture' ((($c.B - $c.T) -gt 3) -and (($c.R - $c.L) -gt 1.5 * ($r.R - $r.L))) (Size $c)
+    Check 'demo: activity shows Compact without gesture' ((($c.B - $c.T) -gt 3) -and (($c.R - $c.L) -gt 1.5 * $idleW)) (Size $c)
     [void][W]::PostMessage($hostWnd, 0x8001, [IntPtr]1, [IntPtr]0x0205); Pump 400
     [System.Windows.Forms.SendKeys]::SendWait('{DOWN}{DOWN}{DOWN}{ENTER}'); Pump 600
     $c = InRect

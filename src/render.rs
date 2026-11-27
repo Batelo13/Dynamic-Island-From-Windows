@@ -418,7 +418,10 @@ fn create_device() -> Result<(ID3D11Device, ID2D1Device)> {
         unsafe { d3d11_create_device(null, driver, HMODULE::default(), flags, std::ptr::null(), 0, D3D11_SDK_VERSION, &mut device, null.cast(), null.cast()).ok()? };
         device.ok_or_else(|| windows::core::Error::from_hresult(windows::Win32::Foundation::E_FAIL))
     };
-    let d3d = make(D3D_DRIVER_TYPE_HARDWARE).or_else(|_| make(D3D_DRIVER_TYPE_WARP))?;
+    // WARP (CPU rasterizer) first: we only draw small text/art surfaces at most once a second, and keeping the
+    // vendor GPU driver out of this process avoids a hang seen in the Intel driver (dcomp → d3d11 → igd10um64xe
+    // spinning at 100%, 2026-11-27). The compositor itself still runs on the GPU in DWM.
+    let d3d = make(D3D_DRIVER_TYPE_WARP).or_else(|_| make(D3D_DRIVER_TYPE_HARDWARE))?;
     let d2d = unsafe { D2D1CreateDevice(&d3d.cast::<IDXGIDevice>()?, None)? };
     Ok((d3d, d2d))
 }
