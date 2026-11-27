@@ -243,7 +243,8 @@ impl Renderer {
         // Bars: right slot of the Compact, vertically centered, each pulsing at its own pace.
         let (bw, gap, bh) = (px(theme::BAR_W_DIP).round().max(2.0), px(theme::BAR_GAP_DIP).round(), px(theme::BAR_H_DIP).round());
         let total = theme::BAR_COUNT as f32 * bw + (theme::BAR_COUNT - 1) as f32 * gap;
-        self.bars.SetOffset(Vector3 { X: f.x + f.w - px(theme::CONTENT_INSET_DIP) - total, Y: f.y + (f.h - bh) / 2.0, Z: 0.0 })?;
+        // Same inset from the right end as the art has from the left.
+        self.bars.SetOffset(Vector3 { X: f.x + f.w - px(theme::COMPACT_SIDE_INSET_DIP) - total, Y: f.y + (f.h - bh) / 2.0, Z: 0.0 })?;
         let playing = m.is_some_and(|m| m.playing);
         for (i, bar) in self.bars.Children()?.into_iter().enumerate() {
             bar.SetSize(v2(bw, bh))?;
@@ -518,7 +519,7 @@ fn draw(gpu: &Gpu, surface: &CompositionDrawingSurface, size: SizeInt32, visual:
             (Visual::Compact, Some(m)) => {
                 // Art in the left slot; the bars on the right are live visuals (update_live).
                 let side = px(theme::ART_COMPACT_DIP);
-                art(m, ox + px(theme::ART_COMPACT_INSET_DIP), oy + (h - side) / 2.0, side)?;
+                art(m, ox + px(theme::COMPACT_SIDE_INSET_DIP), oy + (h - side) / 2.0, side)?;
                 return Ok(());
             }
             (Visual::Expanded, Some(m)) => {

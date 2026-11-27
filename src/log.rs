@@ -36,7 +36,8 @@ fn append(path: &Path, max: u64, level: &str, msg: &str) {
     }
     let ts = SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_secs()).unwrap_or(0);
     if let Ok(mut f) = fs::OpenOptions::new().create(true).append(true).open(path) {
-        let _ = writeln!(f, "{ts} {level} {msg}");
+        // One write per line: `writeln!` issues several, which interleave when the media thread logs too.
+        let _ = f.write_all(format!("{ts} {level} {msg}\n").as_bytes());
     }
 }
 
