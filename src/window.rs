@@ -4,7 +4,7 @@
 //! - input:  invisible (alpha 1) window clipped to the island shape; receives mouse input, never activates.
 use crate::{
     i18n::{t, Text},
-    island::{self, Event, Island},
+    island::{self, Event, Island, Visual},
     layout, log,
     render::{Frame, Renderer},
     settings::{self, Settings},
@@ -40,6 +40,7 @@ const ID_DEMO_START: usize = 3;
 #[cfg(debug_assertions)]
 const ID_DEMO_END: usize = 4;
 const TIMER_COLLAPSE: usize = 1;
+const TIMER_REVEAL: usize = 2;
 const WM_MOUSELEAVE: u32 = 0x02A3;
 const MONITORINFOF_PRIMARY: u32 = 1;
 const WTS_SESSION_LOCK: usize = 0x7;
@@ -63,6 +64,9 @@ struct App {
     animations: bool,
     /// TrackMouseEvent armed (cursor inside the input window).
     hovering: bool,
+    /// Last input-window geometry (rect, corner radius). Re-applying an identical region cancels
+    /// mouse tracking and fakes a MouseLeave, so unchanged geometry is skipped.
+    input_shape: Option<(layout::Rect, i32)>,
 }
 
 thread_local! {
@@ -114,6 +118,7 @@ pub fn create(startup: Instant) -> Result<()> {
         dpi: 96,
         animations: animations_enabled(),
         hovering: false,
+        input_shape: None,
     };
     app.add_tray_icon();
     APP.with(|a| *a.borrow_mut() = Some(app));
@@ -157,27 +162,39 @@ impl App {
     /// Push the island's target shape to the input window (region = destination, design.md D2) and renderer.
     fn apply_shape(&mut self, animate: bool) {
         let Some(p) = self.placement else { return };
+        let visual = self.island.visual();
+        let hidden = visual == Visual::Hidden;
         let size = self.island.shape();
         let c = p.shape(size);
         let radius = p.px(size.radius);
         let v = p.visual;
+        // Hidden: park the shape (and its shadow) above the visual window so the window edge clips it;
+        // revealing then slides it down with the same spring (design.md D12).
+        let y = if hidden { -(c.height() + p.px(theme::SHADOW_PAD_DIP)) } else { c.top - v.top };
+        // While hidden the input window is only the reveal strip.
+        let input = if hidden { p.strip() } else { c };
         let frame = Frame {
             x: (c.left - v.left) as f32,
-            y: (c.top - v.top) as f32,
+            y: y as f32,
             w: c.width() as f32,
             h: c.height() as f32,
             radius: radius as f32,
         };
+        let shape = (input, if hidden { 0 } else { radius });
+        let moved = self.input_shape != Some(shape);
+        self.input_shape = Some(shape);
         let result = (|| -> Result<()> {
-            unsafe {
-                // ponytail: region jumps to the target shape; ~400 ms mismatch while the spring runs.
-                // Upgrade: sample the spring in-process during transitions if phantom clicks show up.
-                SetWindowPos(self.input, Some(HWND_TOPMOST), c.left, c.top, c.width(), c.height(), SWP_NOACTIVATE | SWP_NOOWNERZORDER)?;
-                // Region coords are window-relative; +1 because GDI excludes right/bottom edges.
-                let rgn = CreateRoundRectRgn(0, 0, c.width() + 1, c.height() + 1, radius * 2, radius * 2);
-                SetWindowRgn(self.input, Some(rgn), true); // system owns rgn after this call
+            if moved {
+                unsafe {
+                    // ponytail: region jumps to the target shape; ~400 ms mismatch while the spring runs.
+                    // Upgrade: sample the spring in-process during transitions if phantom clicks show up.
+                    SetWindowPos(self.input, Some(HWND_TOPMOST), input.left, input.top, input.width(), input.height(), SWP_NOACTIVATE | SWP_NOOWNERZORDER)?;
+                    // Region coords are window-relative; +1 because GDI excludes right/bottom edges. Strip: plain rect.
+                    let rgn = (!hidden).then(|| CreateRoundRectRgn(0, 0, c.width() + 1, c.height() + 1, radius * 2, radius * 2));
+                    SetWindowRgn(self.input, rgn, true); // system owns rgn after this call
+                }
             }
-            self.renderer.apply(frame, self.island.visual(), self.dpi, animate && self.animations)
+            self.renderer.apply(frame, visual, self.island.activity(), self.dpi, animate && self.animations)
         })();
         if let Err(e) = result {
             log::error(&format!("apply shape failed: {e}"));
@@ -186,12 +203,17 @@ impl App {
     }
 
     fn send(&mut self, event: Event, animate: bool) {
-        match self.island.on(event) {
-            island::Timer::Start => unsafe {
+        let timer = self.island.on(event);
+        match timer {
+            island::Timer::StartReveal => unsafe {
+                SetTimer(Some(self.host), TIMER_REVEAL, theme::REVEAL_DELAY_MS, None);
+            },
+            island::Timer::StartLeave => unsafe {
                 SetTimer(Some(self.host), TIMER_COLLAPSE, theme::COLLAPSE_AFTER_LEAVE_MS, None);
             },
             island::Timer::Stop => unsafe {
                 let _ = KillTimer(Some(self.host), TIMER_COLLAPSE);
+                let _ = KillTimer(Some(self.host), TIMER_REVEAL);
             },
             island::Timer::Keep => {}
         }
@@ -346,6 +368,13 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             app.send(Event::MouseLeave, true);
         }),
         WM_LBUTTONUP => with_app(|app| app.send(Event::Click, true)),
+        WM_TIMER if wparam.0 == TIMER_REVEAL => {
+            with_app(|app| {
+                let _ = unsafe { KillTimer(Some(app.host), TIMER_REVEAL) }; // one-shot
+                app.send(Event::RevealTimeout, true);
+            });
+            return LRESULT(0);
+        }
         WM_TIMER if wparam.0 == TIMER_COLLAPSE => {
             with_app(|app| {
                 let _ = unsafe { KillTimer(Some(app.host), TIMER_COLLAPSE) }; // one-shot: no periodic timer left

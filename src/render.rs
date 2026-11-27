@@ -15,6 +15,7 @@ use windows::{
     },
     Win32::{
         Foundation::{HANDLE, HMODULE, HWND, POINT},
+        Globalization::{GetDateFormatEx, GetTimeFormatEx, DATE_LONGDATE, TIME_NOSECONDS},
         System::LibraryLoader::{GetProcAddress, LoadLibraryW},
         Graphics::{
             Direct2D::{
@@ -78,7 +79,7 @@ pub struct Renderer {
     geometry: CompositionRoundedRectangleGeometry,
     gpu: Option<Gpu>,
     frame: Option<Frame>,
-    content: Option<(Visual, u32)>,
+    content: Option<(Visual, bool, u32)>,
     /// Signalled by D3D when the device is removed; window waits on it (no polling).
     pub device_removed: Option<HANDLE>,
 }
@@ -170,16 +171,16 @@ impl Renderer {
         Ok(())
     }
 
-    /// Move the shape to `frame` (spring when `animate`), and swap content if `visual`/`dpi` changed.
-    pub fn apply(&mut self, frame: Frame, visual: Visual, dpi: u32, animate: bool) -> Result<()> {
+    /// Move the shape to `frame` (spring when `animate`), and swap content if `visual`/`activity`/`dpi` changed.
+    pub fn apply(&mut self, frame: Frame, visual: Visual, activity: bool, dpi: u32, animate: bool) -> Result<()> {
         if self.frame != Some(frame) {
             let animate = animate && self.frame.is_some();
             self.frame = Some(frame);
             self.move_shape(frame, animate)?;
         }
-        if self.content != Some((visual, dpi)) {
-            self.content = Some((visual, dpi));
-            self.swap_content(frame, visual, dpi as f32 / 96.0, animate)?;
+        if self.content != Some((visual, activity, dpi)) {
+            self.content = Some((visual, activity, dpi));
+            self.swap_content(frame, visual, activity, dpi as f32 / 96.0, animate)?;
         }
         Ok(())
     }
@@ -220,10 +221,11 @@ impl Renderer {
         visual.StartAnimation(h!("Opacity"), &a)
     }
 
-    fn swap_content(&mut self, frame: Frame, visual: Visual, scale: f32, animate: bool) -> Result<()> {
+    fn swap_content(&mut self, frame: Frame, visual: Visual, activity: bool, scale: f32, animate: bool) -> Result<()> {
+        let has_content = matches!(visual, Visual::Compact | Visual::Expanded);
         if self.gpu.is_none() {
-            if visual == Visual::Idle {
-                return Ok(()); // Idle has no content: keep D3D unloaded.
+            if !has_content {
+                return Ok(()); // Hidden/Idle have no content: keep D3D unloaded.
             }
             self.gpu = Some(self.create_gpu()?);
         }
@@ -234,9 +236,9 @@ impl Renderer {
         new.visual.SetOffset(Vector3 { X: frame.x, Y: frame.y, Z: 0.0 })?;
         new.visual.SetSize(v2(frame.w, frame.h))?;
         new.visual.SetOpacity(0.0)?;
-        if visual != Visual::Idle {
+        if has_content {
             let size = SizeInt32 { Width: frame.w.ceil() as i32, Height: frame.h.ceil() as i32 };
-            draw(gpu, &new.surface, size, visual, scale)?;
+            draw(gpu, &new.surface, size, visual, activity, scale)?;
             self.fade(&new.visual, 1.0, theme::CONTENT_FADE_IN_DELAY_MS, theme::CONTENT_FADE_IN_MS, animate)?;
         }
         if let Some(gpu) = self.gpu.as_mut() {
@@ -319,7 +321,19 @@ fn watch_device(d3d: &ID3D11Device) -> Option<HANDLE> {
     Some(event)
 }
 
-fn draw(gpu: &Gpu, surface: &CompositionDrawingSurface, size: SizeInt32, visual: Visual, scale: f32) -> Result<()> {
+/// Current time (no seconds) and long date in the user's locale, e.g. "20:45" / "quinta-feira, 26 de novembro de 2026".
+fn now_strings() -> (String, String) {
+    let fmt = |f: &dyn Fn(&mut [u16]) -> i32| {
+        let mut buf = [0u16; 128];
+        let n = f(&mut buf).max(1) as usize;
+        String::from_utf16_lossy(&buf[..n - 1])
+    };
+    let time = fmt(&|b| unsafe { GetTimeFormatEx(PCWSTR::null(), TIME_NOSECONDS, None, PCWSTR::null(), Some(b)) });
+    let date = fmt(&|b| unsafe { GetDateFormatEx(PCWSTR::null(), DATE_LONGDATE, None, PCWSTR::null(), Some(b), PCWSTR::null()) });
+    (time, date)
+}
+
+fn draw(gpu: &Gpu, surface: &CompositionDrawingSurface, size: SizeInt32, visual: Visual, activity: bool, scale: f32) -> Result<()> {
     surface.Resize(size)?;
     let interop = surface.cast::<ICompositionDrawingSurfaceInterop>()?;
     let mut offset = POINT::default();
@@ -350,7 +364,17 @@ fn draw(gpu: &Gpu, surface: &CompositionDrawingSurface, size: SizeInt32, visual:
         }
         // ponytail: fixed placeholder content (debug Demo only); real activities bring their own payloads.
         match visual {
-            Visual::Idle => {}
+            Visual::Hidden | Visual::Idle => {}
+            Visual::Expanded if !activity => {
+                // ponytail: drawn once when expanding, not a live clock (content phase brings real widgets).
+                let inset = px(theme::EXPANDED_INSET_DIP);
+                let line = |top: f32, height: f32| D2D_RECT_F { left: ox + inset, top: oy + px(top), right: ox + w - inset, bottom: oy + px(top + height) };
+                let clock = format(theme::FONT_CLOCK_DIP, DWRITE_FONT_WEIGHT_SEMI_BOLD)?;
+                let date = format(theme::FONT_SUBTITLE_DIP, DWRITE_FONT_WEIGHT_REGULAR)?;
+                let (time_s, date_s) = now_strings();
+                text(&time_s, &clock, line(30.0, 56.0), theme::TEXT_PRIMARY)?;
+                text(&date_s, &date, line(90.0, 20.0), theme::TEXT_SECONDARY)?;
+            }
             Visual::Compact => {
                 let inset = px(theme::CONTENT_INSET_DIP);
                 let r = px(4.0);

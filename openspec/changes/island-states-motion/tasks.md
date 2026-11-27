@@ -38,9 +38,9 @@
 
 ## 6. Auto-ocultar e revelar pelo topo (revisão de 2026-11-26)
 
-- [ ] 6.1 `Island`: estado Oculta, `revealed`, `RevealTimeout`, `Timer::StartReveal`; sair por 1 s → Compact (com atividade) ou Oculta (sem); clique em Idle → Expanded; testes unitários
-- [ ] 6.2 `window.rs`: janela de entrada vira a faixa de 2 px × largura Idle quando Oculta (D12); timer de 150 ms para revelar, cancelado no `WM_MOUSELEAVE`
-- [ ] 6.3 `layout`/`render`: forma Oculta acima da borda superior (Offset.Y negativo), mesma mola; instantâneo com animações desligadas
-- [ ] 6.4 Expanded sem atividade mostra hora e data (placeholder, desenhado ao expandir; sem relógio ao vivo)
-- [ ] 6.5 `check-window.ps1`: nada visível ao iniciar; faixa recebe e 1 px ao lado/abaixo passa; onde a cápsula apareceria passa; revela após 150 ms; oculta 1 s após sair; checagens de Idle passam a rodar com a ilha revelada
+- [x] 6.1 `Island`: estado Oculta, `revealed`, `RevealTimeout`, `Timer::StartReveal`; sair por 1 s → Compact (com atividade) ou Oculta (sem); clique em Idle → Expanded; testes unitários
+- [x] 6.2 `window.rs`: janela de entrada vira a faixa de 2 px × largura Idle quando Oculta (D12); timer de 150 ms para revelar, cancelado no `WM_MOUSELEAVE`
+- [x] 6.3 `layout`/`render`: forma Oculta acima da borda superior (Offset.Y negativo), mesma mola; instantâneo com animações desligadas
+- [x] 6.4 Expanded sem atividade mostra hora e data (placeholder, desenhado ao expandir; sem relógio ao vivo)
+- [x] 6.5 `check-window.ps1`: nada visível ao iniciar; faixa recebe e 1 px ao lado/abaixo passa; onde a cápsula apareceria passa; revela após 150 ms; oculta 1 s após sair; checagens de Idle passam a rodar com a ilha revelada
 - [ ] 6.6 Refazer 5.2/5.3 com o comportamento novo (o benchmark de 2026-11-26 mediu Idle sempre visível)

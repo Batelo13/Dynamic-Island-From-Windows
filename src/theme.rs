@@ -32,6 +32,9 @@ pub const CONTENT_FADE_OUT_MS: i64 = 80;
 pub const CONTENT_FADE_IN_DELAY_MS: i64 = 260;
 pub const CONTENT_FADE_IN_MS: i64 = 120;
 pub const COLLAPSE_AFTER_LEAVE_MS: u32 = 1000;
+/// Invisible top-center strip that reveals the hidden island (design.md D12): height, and dwell time.
+pub const REVEAL_STRIP_DIP: f32 = 2.0;
+pub const REVEAL_DELAY_MS: u32 = 150;
 
 pub const TEXT_PRIMARY: u32 = 0xFFFFFF;
 pub const TEXT_SECONDARY: u32 = 0x9A9A9F;
@@ -40,6 +43,7 @@ pub const FONT_FAMILY: &str = "Segoe UI Variable Text";
 pub const FONT_COMPACT_DIP: f32 = 13.0;
 pub const FONT_TITLE_DIP: f32 = 15.0;
 pub const FONT_SUBTITLE_DIP: f32 = 12.0;
+pub const FONT_CLOCK_DIP: f32 = 40.0;
 /// Horizontal inset of Compact slots / Expanded content.
 pub const CONTENT_INSET_DIP: f32 = 14.0;
 pub const EXPANDED_INSET_DIP: f32 = 22.0;

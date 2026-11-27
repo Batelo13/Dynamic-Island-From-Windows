@@ -45,6 +45,8 @@ pub struct Placement {
     /// Horizontal center and top edge every shape is anchored to (screen px).
     pub center_x: i32,
     pub top: i32,
+    /// Top of the work area (the reveal strip hugs it, ignoring the margin).
+    pub work_top: i32,
     pub scale: f32,
 }
 
@@ -59,6 +61,12 @@ impl Placement {
         let left = self.center_x - w / 2;
         Rect { left, top: self.top, right: left + w, bottom: self.top + h }
     }
+
+    /// Reveal strip while hidden: Idle width, a couple of px tall, flush with the work-area top.
+    pub fn strip(&self) -> Rect {
+        let idle = self.shape(theme::IDLE);
+        Rect { left: idle.left, top: self.work_top, right: idle.right, bottom: self.work_top + self.px(theme::REVEAL_STRIP_DIP).max(1) }
+    }
 }
 
 pub fn place(work: Rect, dpi: u32, top_margin_dip: f32) -> Placement {
@@ -71,7 +79,7 @@ pub fn place(work: Rect, dpi: u32, top_margin_dip: f32) -> Placement {
     let (max_w, pad) = (px(theme::MAX_W), px(theme::SHADOW_PAD_DIP));
     let left = center_x - max_w / 2;
     let visual = Rect { left, top, right: left + max_w, bottom: top + px(theme::MAX_H) }.inflate(pad);
-    Placement { visual, center_x, top, scale }
+    Placement { visual, center_x, top, work_top: work.top, scale }
 }
 
 #[cfg(test)]
@@ -90,6 +98,8 @@ mod tests {
         // Every state shares the top edge and center.
         let e = p.shape(theme::EXPANDED);
         assert_eq!((e.top, (e.left + e.right) / 2), (8, 960));
+        // Reveal strip: same span as Idle, flush with the work-area top, 2 px tall.
+        assert_eq!(p.strip(), r(897, 0, 1023, 2));
     }
 
     #[test]
