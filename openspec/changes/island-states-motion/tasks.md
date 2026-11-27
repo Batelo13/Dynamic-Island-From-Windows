@@ -29,12 +29,12 @@
 ## 5. Validação
 
 - [x] 5.1 `cargo test`, `cargo clippy --all-targets` limpos
-- [ ] 5.2 Benchmark em repouso 10 min, depois de passar por Compact/Expanded (dispositivo D3D criado), registrado em `docs/benchmarks.md` (conjunto de trabalho privado < 50 MB; commit como informação, ver Riscos do design)
+- [x] 5.2 Benchmark em repouso 10 min, depois de passar por Compact/Expanded (dispositivo D3D criado), registrado em `docs/benchmarks.md` (conjunto de trabalho privado < 50 MB; commit como informação, ver Riscos do design)
 - [x] 5.3 Benchmark de transições contínuas por 30 s (CPU média + retorno ao repouso em ≤ 2 s) em `docs/benchmarks.md`
-- [ ] 5.4 Manual: interrupção da mola sem salto, assentamento ≤ 600 ms, animações desligadas → instantâneo, Win+L com Expanded, troca de escala com texto, `Win+Ctrl+Shift+B` (perda de dispositivo), foco inalterado ao clicar — em `docs/testing.md`
+- [x] 5.4 Manual: interrupção da mola sem salto, assentamento ≤ 600 ms, animações desligadas → instantâneo, Win+L com Expanded, troca de escala com texto, `Win+Ctrl+Shift+B` (perda de dispositivo), foco inalterado ao clicar — em `docs/testing.md`
 - [x] 5.5 Screenshots dos 3 estados sobre fundo claro e escuro comparados com as refs 1, 2, 4 e 5; ajustar tokens
 - [x] 5.6 Atualizar grafo com Graphify (`--update`)
-- [ ] 5.7 `openspec validate island-states-motion --strict`
+- [x] 5.7 `openspec validate island-states-motion --strict`
 
 ## 6. Auto-ocultar e revelar pelo topo (revisão de 2026-11-26)
 
@@ -43,4 +43,4 @@
 - [x] 6.3 `layout`/`render`: forma Oculta acima da borda superior (Offset.Y negativo), mesma mola; instantâneo com animações desligadas
 - [x] 6.4 Expanded sem atividade mostra hora e data (placeholder, desenhado ao expandir; sem relógio ao vivo)
 - [x] 6.5 `check-window.ps1`: nada visível ao iniciar; faixa recebe e 1 px ao lado/abaixo passa; onde a cápsula apareceria passa; revela após 150 ms; oculta 1 s após sair; checagens de Idle passam a rodar com a ilha revelada
-- [ ] 6.6 Refazer 5.2/5.3 com o comportamento novo (o benchmark de 2026-11-26 mediu Idle sempre visível)
+- [x] 6.6 Refazer 5.2/5.3 com o comportamento novo (o benchmark de 2026-11-26 mediu Idle sempre visível)

@@ -21,13 +21,14 @@ Métrica da meta: **RAM privada** (conjunto de trabalho privado, a coluna "Memó
 
 | Data | Estado | Duração | RAM privada (MB, meta < 50) | Commit privado (MB) | Working set (MB) | CPU média | Binário |
 |---|---|---|---|---|---|---|---|
+| 2026-11-26 23:48 | Oculta, sem atividade (release) | 10 min | 1,4 avg / 1,7 peak | 2,9 avg / 3,1 peak | 15,2 avg / 15,4 peak | 0,000% de 12 threads | 352 KB |
 | 2026-11-26 21:26 | Compact (D3D/texto carregados), build profiling | 10 min | 38,8 avg / 39,4 peak | 60,8 avg / 61,0 peak | 72,2 avg / 72,8 peak | 0,000% de 12 threads | 372 KB |
 
 Medições pontuais (release, após a correção do carregamento sob demanda do `d3d11`):
 - Oculta/Idle sem texto: 3,0 MB de commit e 1,6 MB de RAM privada; `dxgi`/`d3d11` não carregam.
 - Antes da correção: 56,5 MB de commit em Idle.
 
-Pendente: refazer os 10 min em repouso com o comportamento final. A rodada das 21:16 foi descartada porque a ilha foi revelada e clicada durante a medição, o que carregou o texto.
+A rodada de repouso das 21:16 foi descartada porque a ilha foi revelada e clicada durante a medição (o que carregou o texto); a das 23:48 rodou sem interação.
 
 ### Transições (tarefa 5.3)
 

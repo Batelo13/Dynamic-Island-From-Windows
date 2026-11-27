@@ -71,13 +71,15 @@ Capturas a 125% sobre fundo branco, preto e barra de título escura:
 - **Expanded** 360×160 DIP, raio 32 (20% da altura): bate com o card de mídia da ref 4 (~19%). Título e subtítulo hierarquizados como nas refs 1 e 5; o relógio sem atividade usa Segoe UI Variable 40 DIP.
 - Veredito: compatível; tokens mantidos.
 
-### Manuais pendentes (tarefa 5.4)
+### Manuais (tarefa 5.4) — 2026-11-26
+
+Feitos pelo usuário no build `profiling` (com menu Demo).
 
 | Cenário | Status |
 |---|---|
-| Interrupção da mola sem salto (ex.: clicar e sair no meio da expansão) | ⏳ requer olho humano |
-| Assentamento visual ≤ 600 ms | ⏳ |
-| "Efeitos de animação" desligado → aparece/some instantâneo | ⏳ |
-| Win+L com a ilha expandida → desbloqueia oculta (ou Compact com atividade) | ⏳ |
-| Troca de escala com texto visível (125% ↔ 150%) | ⏳ |
-| `Win+Ctrl+Shift+B` (perda de dispositivo) com texto visível | ⏳ |
+| Interrupção da mola sem salto (clicar e sair no meio da expansão) | ✅ |
+| Assentamento visual ≤ 600 ms | ✅ |
+| "Efeitos de animação" desligado → aparece/some instantâneo | ✅ |
+| Win+L com a ilha expandida → desbloqueia oculta (ou Compact com atividade) | ✅ |
+| Troca de escala com texto visível (125% ↔ 150%) | ✅ |
+| `Win+Ctrl+Shift+B` (perda de dispositivo) com texto visível → texto volta sozinho | ✅ |
