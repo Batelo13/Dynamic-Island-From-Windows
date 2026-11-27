@@ -20,7 +20,7 @@ use windows::{
         Graphics::{
             Direct2D::{
                 Common::{D2D1_ALPHA_MODE_PREMULTIPLIED, D2D1_COLOR_F, D2D1_PIXEL_FORMAT, D2D_RECT_F, D2D_SIZE_U},
-                D2D1CreateDevice, ID2D1Device, ID2D1DeviceContext, D2D1_BITMAP_OPTIONS_NONE, D2D1_BITMAP_PROPERTIES1, D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_ELLIPSE,
+                D2D1CreateDevice, ID2D1Device, ID2D1DeviceContext, D2D1_BITMAP_OPTIONS_NONE, D2D1_BITMAP_PROPERTIES1, D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC, D2D1_DRAW_TEXT_OPTIONS_NONE, D2D1_ELLIPSE,
                 D2D1_ROUNDED_RECT,
             },
             Direct3D::{D3D_DRIVER_TYPE, D3D_DRIVER_TYPE_HARDWARE, D3D_DRIVER_TYPE_WARP, D3D_FEATURE_LEVEL},
@@ -500,6 +500,8 @@ fn draw(gpu: &Gpu, surface: &CompositionDrawingSurface, size: SizeInt32, visual:
                 let brush = unsafe { dc.CreateBitmapBrush(&bmp, None, None)? };
                 let k = side / n as f32;
                 unsafe {
+                    // Default linear filtering aliases when shrinking the art ~3x (Compact); HQ cubic filters properly.
+                    brush.SetInterpolationMode1(D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC);
                     brush.SetTransform(&Matrix3x2 { M11: k, M12: 0.0, M21: 0.0, M22: k, M31: x, M32: y });
                     dc.FillRoundedRectangle(&rr, &brush);
                 }
@@ -516,8 +518,7 @@ fn draw(gpu: &Gpu, surface: &CompositionDrawingSurface, size: SizeInt32, visual:
             (Visual::Compact, Some(m)) => {
                 // Art in the left slot; the bars on the right are live visuals (update_live).
                 let side = px(theme::ART_COMPACT_DIP);
-                let margin = (h - side) / 2.0;
-                art(m, ox + margin, oy + margin, side)?;
+                art(m, ox + px(theme::ART_COMPACT_INSET_DIP), oy + (h - side) / 2.0, side)?;
                 return Ok(());
             }
             (Visual::Expanded, Some(m)) => {

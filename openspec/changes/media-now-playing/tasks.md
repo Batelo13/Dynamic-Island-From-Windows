@@ -8,7 +8,7 @@
 
 - [x] 2.1 Features `Media_Control`, `Storage_Streams`, `Win32_Graphics_Imaging`; `src/media.rs` com thread MTA, gerenciador e assinatura dos eventos, reassinando ao trocar de sessão (D1)
 - [x] 2.2 `Snapshot`: título, artista, tocando, comandos disponíveis, posição/duração/instante; entrega via `Arc<Mutex>` + `WM_MEDIA`
-- [x] 2.3 Capa: stream → WIC → BGRA 96×96 pré-multiplicado, só quando a faixa muda (D2)
+- [x] 2.3 Capa: stream → WIC → BGRA 160×160 pré-multiplicado, desenhada com filtro cúbico de alta qualidade, só quando a faixa muda (D2)
 - [x] 2.4 Comandos anterior/tocar-pausar/próxima pelo canal, sem esperar resultado
 - [x] 2.5 Falha de `RequestAsync` → log de aviso e app segue sem música
 

@@ -35,10 +35,10 @@ Motivação e escopo: `proposal.md`. Requisitos: `specs/media-playback` e `specs
 - **Alternativas:** fazer tudo na thread da UI com callbacks `SetCompleted` (mais código assíncrono espalhado e risco de reentrância no wndproc); polling de 1 s (viola o requisito de custo).
 
 ### D2 — Capa decodificada uma vez, pequena
-- `Thumbnail().OpenReadAsync()`: lê o stream, `CreateStreamOverRandomAccessStream` e WIC (`IWICImagingFactory` → decoder → `IWICBitmapScaler` com `HighQualityCubic`), gerando BGRA pré-multiplicado de 96×96 px.
+- `Thumbnail().OpenReadAsync()`: lê o stream, `CreateStreamOverRandomAccessStream` e WIC (`IWICImagingFactory` → decoder → `IWICBitmapScaler` com `HighQualityCubic`), gerando BGRA pré-multiplicado de 160×160 px.
 - A decodificação roda na thread de mídia e só refaz quando a faixa muda (chave: título + artista + tamanho do stream).
-- A UI cria um `ID2D1Bitmap1` a partir dos bytes ao desenhar e o reusa no Compact (reduzido) e no Expanded. Custo: ~36 KB por capa.
-- `ponytail:` 96 px fixos (cobre 56 DIP a 150%). Em monitores a 200%+ a capa fica levemente suave; o upgrade é decodificar no tamanho exato da escala.
+- A UI cria um `ID2D1Bitmap1` a partir dos bytes ao desenhar e o reusa no Compact (reduzido) e no Expanded, com o pincel em `D2D1_INTERPOLATION_MODE_HIGH_QUALITY_CUBIC`. O filtro linear padrão serrilhava a capa reduzida ~3× no Compact (reportado pelo usuário). Custo: ~100 KB por capa.
+- `ponytail:` 160 px fixos (cobrem 56 DIP até ~285% sem ampliar). O upgrade é decodificar no tamanho exato da escala.
 
 ### D3 — Atividade e pausa na máquina de estados
 - `Island` passa a ter `activity: bool` + `dormant: bool`:

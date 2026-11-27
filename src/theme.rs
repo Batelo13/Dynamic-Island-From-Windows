@@ -52,10 +52,12 @@ pub const EXPANDED_INSET_DIP: f32 = 22.0;
 
 // Media (media-now-playing D4/D5). Positions are relative to the shape, in DIP.
 pub const ICON_FONT: &str = "Segoe Fluent Icons";
-pub const ART_PX: u32 = 96; // decoded album-art size (covers 56 DIP at 150%)
+pub const ART_PX: u32 = 160; // decoded album-art size: 56 DIP up to ~285% without upscaling (~100 KB)
 pub const ART_RADIUS_DIP: f32 = 10.0;
 pub const ART_EXPANDED_DIP: f32 = 56.0;
 pub const ART_COMPACT_DIP: f32 = 25.0;
+/// Left inset of the Compact art: clear of the pill's rounded end (user feedback: 6 DIP looked cramped).
+pub const ART_COMPACT_INSET_DIP: f32 = 10.0;
 pub const ART_PLACEHOLDER: u32 = 0x2C2C2E;
 pub const BAR_COLOR: u32 = 0xE5E5EA;
 pub const BAR_COUNT: usize = 4;
