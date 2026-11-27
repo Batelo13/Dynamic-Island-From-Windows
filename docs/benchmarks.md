@@ -37,3 +37,17 @@ A rodada de repouso das 21:16 foi descartada porque a ilha foi revelada e clicad
 | 2026-11-26 21:05 | 84 transições de hover em 30 s (Compact, profiling) | 0,04% | n/d (exige elevação) | 0,00% | 0,00% |
 
 As molas rodam no compositor (DWM), não no processo do app.
+
+## media-now-playing — 2026-11-27
+
+Release com WARP (texto e capa rasterizados na CPU, sem o driver da GPU no processo).
+
+| Data | Estado | Duração | RAM privada (MB, meta < 50) | Commit privado (MB) | Working set (MB) | CPU média | Binário |
+|---|---|---|---|---|---|---|---|
+| 2026-11-27 07:10 | Compact com música (Spotify tocando; entrada no fim: 313x46) | 10 min | 9,2 avg / 10,6 peak | 68,8 avg / 71,7 peak | 41,5 avg / 43,1 peak | 0,006% de 12 threads | 418 KB |
+| 2026-11-27 01:38 | Oculta (a música não estava na ilha; entrada no fim: 158x3) | 10 min | 2,5 avg / 2,5 peak | 4,2 avg / 4,3 peak | 25,0 avg / 25,1 peak | 0,002% de 12 threads | 418 KB |
+
+- A rodada das 01:38 foi rotulada como "com música", mas a ilha estava oculta (faixa de revelação de 158x3). Fica registrada só como mais uma medição da ilha oculta.
+- Antes de iniciar a rodada das 07:10, o app foi aberto para conferir: entrada 250x37 (Compact) e dispositivo de texto criado. O tamanho de 313x46 no fim é maior que o Compact em repouso e é compatível com o hover leve (cursor sobre a ilha).
+- Medição pontual anterior, com o Expanded de música aberto: 10,2 MB de RAM privada e cerca de 0,9% de CPU (atualização dos tempos a cada 1 s).
+- As barrinhas e a barra de progresso rodam no compositor: com música tocando, a CPU média do app ficou em 0,006%.

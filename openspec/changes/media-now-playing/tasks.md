@@ -32,7 +32,7 @@
 - [x] 5.1 `cargo test` e `cargo clippy --all-targets` limpos
 - [ ] 5.2 Manual com Spotify: aparece sozinho em ≤ 1 s, troca de faixa, pausar/tocar/próxima/anterior pela ilha sem mudar o foco, pausa > 30 s some, revelar com pausada mostra Compact, fechar o Spotify oculta; YouTube no navegador como segundo player — em `docs/testing.md`
 - [ ] 5.3 `check-window.ps1` continua passando (sem música tocando)
-- [ ] 5.4 Benchmark 10 min com música tocando em Compact (RAM privada < 50 MB, CPU < 0,5%) em `docs/benchmarks.md`
+- [x] 5.4 Benchmark 10 min com música tocando em Compact (RAM privada < 50 MB, CPU < 0,5%) em `docs/benchmarks.md`
 - [ ] 5.5 Screenshots Compact/Expanded com música comparados às refs 1, 4 e 5; ajustar tokens (inclusive altura do Expanded)
 - [x] 5.6 Graphify `--update`
 - [ ] 5.7 `openspec validate media-now-playing --strict`
