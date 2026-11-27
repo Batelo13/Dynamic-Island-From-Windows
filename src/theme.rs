@@ -35,6 +35,8 @@ pub const COLLAPSE_AFTER_LEAVE_MS: u32 = 1000;
 /// Invisible top-center strip that reveals the hidden island (design.md D12): height, and dwell time.
 pub const REVEAL_STRIP_DIP: f32 = 2.0;
 pub const REVEAL_DELAY_MS: u32 = 150;
+/// Paused activity (music) stays visible this long, then hides (media-now-playing D3).
+pub const PAUSE_HIDE_MS: u32 = 30_000;
 
 pub const TEXT_PRIMARY: u32 = 0xFFFFFF;
 pub const TEXT_SECONDARY: u32 = 0x9A9A9F;
@@ -47,3 +49,28 @@ pub const FONT_CLOCK_DIP: f32 = 40.0;
 /// Horizontal inset of Compact slots / Expanded content.
 pub const CONTENT_INSET_DIP: f32 = 14.0;
 pub const EXPANDED_INSET_DIP: f32 = 22.0;
+
+// Media (media-now-playing D4/D5). Positions are relative to the shape, in DIP.
+pub const ICON_FONT: &str = "Segoe Fluent Icons";
+pub const ART_PX: u32 = 96; // decoded album-art size (covers 56 DIP at 150%)
+pub const ART_RADIUS_DIP: f32 = 10.0;
+pub const ART_EXPANDED_DIP: f32 = 56.0;
+pub const ART_COMPACT_DIP: f32 = 25.0;
+pub const ART_PLACEHOLDER: u32 = 0x2C2C2E;
+pub const BAR_COLOR: u32 = 0xE5E5EA;
+pub const BAR_COUNT: usize = 4;
+pub const BAR_W_DIP: f32 = 3.0;
+pub const BAR_GAP_DIP: f32 = 2.5;
+pub const BAR_H_DIP: f32 = 15.0;
+pub const BAR_PAUSED_SCALE: f32 = 0.3;
+pub const PROGRESS_TRACK: u32 = 0x3A3A3C;
+pub const PROGRESS_Y_DIP: f32 = 102.0;
+pub const PROGRESS_H_DIP: f32 = 4.0;
+/// Room left of/right of the progress track for the elapsed/remaining times.
+pub const PROGRESS_SIDE_DIP: f32 = 44.0;
+pub const FONT_TIME_DIP: f32 = 11.0;
+pub const BUTTONS_Y_DIP: f32 = 136.0;
+pub const BUTTON_SPACING_DIP: f32 = 64.0;
+pub const BUTTON_HIT_DIP: f32 = 36.0;
+pub const FONT_BUTTON_DIP: f32 = 22.0;
+pub const DISABLED: u32 = 0x5A5A5E;

@@ -69,6 +69,16 @@ impl Placement {
     }
 }
 
+/// Click targets of the media Expanded (previous, play/pause, next), relative to the shape, in px.
+pub fn media_buttons(shape_w: i32, scale: f32) -> [Rect; 3] {
+    let px = |dip: f32| (dip * scale).round() as i32;
+    let (cy, half, step) = (px(theme::BUTTONS_Y_DIP), px(theme::BUTTON_HIT_DIP) / 2, px(theme::BUTTON_SPACING_DIP));
+    [-1, 0, 1].map(|i| {
+        let cx = shape_w / 2 + i * step;
+        Rect { left: cx - half, top: cy - half, right: cx + half, bottom: cy + half }
+    })
+}
+
 pub fn place(work: Rect, dpi: u32, top_margin_dip: f32) -> Placement {
     let scale = dpi as f32 / 96.0;
     let px = |dip: f32| (dip * scale).round() as i32;
@@ -119,6 +129,15 @@ mod tests {
         let c = p.shape(theme::IDLE);
         assert_eq!(c.top, 48);
         assert_eq!((c.left + c.right) / 2, 2880);
+    }
+
+    #[test]
+    fn media_buttons_are_centered_on_the_controls_row_without_overlap() {
+        let b = media_buttons(450, 1.25); // Expanded at 125%
+        assert_eq!((b[1].left + b[1].right) / 2, 225);
+        assert!(b[0].right <= b[1].left && b[1].right <= b[2].left);
+        assert_eq!((b[0].top + b[0].bottom) / 2, 170); // 136 DIP * 1.25
+        assert!(b.iter().all(|r| r.bottom <= 200)); // inside the 160 DIP shape
     }
 
     #[test]

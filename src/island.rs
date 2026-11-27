@@ -11,7 +11,6 @@ pub enum Visual {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[cfg_attr(not(debug_assertions), allow(dead_code))] // ActivityStart/End only come from the debug Demo menu for now
 pub enum Event {
     MouseEnter,
     MouseLeave,
@@ -20,6 +19,10 @@ pub enum Event {
     LeaveTimeout,
     ActivityStart,
     ActivityEnd,
+    /// The activity paused (music): stays visible `theme::PAUSE_HIDE_MS`, then goes dormant.
+    Paused,
+    Resumed,
+    PauseTimeout,
     SessionLock,
 }
 
@@ -33,13 +36,18 @@ pub enum Timer {
     StartLeave,
     /// Cancel both.
     Stop,
+    /// Activity paused: go dormant after `theme::PAUSE_HIDE_MS`.
+    StartPause,
+    StopPause,
 }
 
 #[derive(Default)]
 pub struct Island {
     // ponytail: a single bool activity until real sources exist (Phase 3+ brings payloads).
     activity: bool,
-    /// Shown by the top-center gesture while there is no activity.
+    /// Activity paused long enough to hide (design.md D3); revealing still shows it.
+    dormant: bool,
+    /// Shown by the top-center gesture while hidden.
     revealed: bool,
     expanded: bool,
     hover: bool,
@@ -60,11 +68,11 @@ impl Island {
                 if self.visual() == Visual::Hidden {
                     return Timer::Stop; // left the strip before the reveal delay
                 }
-                if self.expanded || !self.activity {
+                if self.expanded || !self.activity || self.dormant {
                     return Timer::StartLeave;
                 }
             }
-            Event::RevealTimeout => self.revealed |= self.hover && !self.activity,
+            Event::RevealTimeout => self.revealed |= self.hover,
             Event::Click => self.expanded |= matches!(self.visual(), Visual::Idle | Visual::Compact),
             Event::LeaveTimeout => {
                 if !self.hover {
@@ -72,14 +80,30 @@ impl Island {
                     self.revealed = false;
                 }
             }
-            Event::ActivityStart => self.activity = true,
+            Event::ActivityStart => {
+                self.activity = true;
+                self.dormant = false;
+            }
             Event::ActivityEnd => {
                 self.activity = false;
+                self.dormant = false;
                 self.expanded = false;
                 self.revealed = self.hover; // stay as Idle under the cursor, else slide away
+                return Timer::StopPause;
+            }
+            Event::Paused => return Timer::StartPause,
+            Event::Resumed => {
+                self.dormant = false;
+                return Timer::StopPause;
+            }
+            Event::PauseTimeout => {
+                self.dormant = self.activity;
+                // Under the cursor it stays (revealed) until the cursor leaves; otherwise it slides away.
+                self.revealed = self.hover;
+                self.expanded &= self.hover;
             }
             Event::SessionLock => {
-                *self = Island { activity: self.activity, ..Island::default() };
+                *self = Island { activity: self.activity, dormant: self.dormant, ..Island::default() };
                 return Timer::Stop;
             }
         }
@@ -91,7 +115,8 @@ impl Island {
     }
 
     pub fn visual(&self) -> Visual {
-        match (self.activity || self.revealed, self.expanded, self.activity) {
+        let shown = (self.activity && !self.dormant) || self.revealed;
+        match (shown, self.expanded, self.activity) {
             (false, _, _) => Visual::Hidden,
             (true, true, _) => Visual::Expanded,
             (true, false, true) => Visual::Compact,
@@ -229,5 +254,71 @@ mod tests {
         i.on(Event::SessionLock);
         assert_eq!(i.visual(), Visual::Compact);
         assert_eq!(i.shape(), theme::COMPACT);
+    }
+
+    fn playing() -> Island {
+        island(&[Event::ActivityStart])
+    }
+
+    #[test]
+    fn pause_keeps_visible_then_goes_dormant_and_hidden() {
+        let mut i = playing();
+        assert_eq!(i.on(Event::Paused), Timer::StartPause);
+        assert_eq!(i.visual(), Visual::Compact);
+        i.on(Event::PauseTimeout);
+        assert_eq!(i.visual(), Visual::Hidden);
+        assert!(i.activity());
+    }
+
+    #[test]
+    fn resume_before_timeout_keeps_it_visible() {
+        let mut i = playing();
+        i.on(Event::Paused);
+        assert_eq!(i.on(Event::Resumed), Timer::StopPause);
+        assert_eq!(i.visual(), Visual::Compact);
+    }
+
+    #[test]
+    fn resume_after_dormant_shows_compact_again() {
+        let mut i = island(&[Event::ActivityStart, Event::Paused, Event::PauseTimeout]);
+        i.on(Event::Resumed);
+        assert_eq!(i.visual(), Visual::Compact);
+    }
+
+    #[test]
+    fn revealing_a_dormant_activity_shows_its_compact_and_expands() {
+        let mut i = island(&[Event::ActivityStart, Event::Paused, Event::PauseTimeout]);
+        assert_eq!(i.on(Event::MouseEnter), Timer::StartReveal);
+        i.on(Event::RevealTimeout);
+        assert_eq!(i.visual(), Visual::Compact);
+        i.on(Event::Click);
+        assert_eq!(i.visual(), Visual::Expanded);
+        assert_eq!(i.on(Event::MouseLeave), Timer::StartLeave);
+        i.on(Event::LeaveTimeout);
+        assert_eq!(i.visual(), Visual::Hidden);
+    }
+
+    #[test]
+    fn revealed_dormant_compact_hides_after_leaving() {
+        let mut i = island(&[Event::ActivityStart, Event::Paused, Event::PauseTimeout, Event::MouseEnter, Event::RevealTimeout]);
+        assert_eq!(i.on(Event::MouseLeave), Timer::StartLeave);
+        i.on(Event::LeaveTimeout);
+        assert_eq!(i.visual(), Visual::Hidden);
+    }
+
+    #[test]
+    fn pause_timeout_under_cursor_waits_for_the_cursor_to_leave() {
+        let mut i = island(&[Event::ActivityStart, Event::MouseEnter, Event::Paused, Event::PauseTimeout]);
+        assert_eq!(i.visual(), Visual::Compact);
+        assert_eq!(i.on(Event::MouseLeave), Timer::StartLeave);
+        i.on(Event::LeaveTimeout);
+        assert_eq!(i.visual(), Visual::Hidden);
+    }
+
+    #[test]
+    fn session_lock_keeps_dormancy() {
+        let mut i = island(&[Event::ActivityStart, Event::Paused, Event::PauseTimeout]);
+        i.on(Event::SessionLock);
+        assert_eq!(i.visual(), Visual::Hidden);
     }
 }

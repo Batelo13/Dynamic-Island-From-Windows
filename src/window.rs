@@ -6,6 +6,7 @@ use crate::{
     i18n::{t, Text},
     island::{self, Event, Island, Visual},
     layout, log,
+    media::{self, Command, Media, Snapshot},
     render::{Frame, Renderer},
     settings::{self, Settings},
     theme,
@@ -33,6 +34,7 @@ use windows::{
 const WM_TRAY: u32 = WM_APP + 1;
 const WM_RELAYOUT: u32 = WM_APP + 2;
 const WM_DEVICE_LOST: u32 = WM_APP + 3;
+const WM_MEDIA: u32 = WM_APP + 4;
 const ID_TOGGLE: usize = 1;
 const ID_QUIT: usize = 2;
 #[cfg(debug_assertions)]
@@ -41,6 +43,9 @@ const ID_DEMO_START: usize = 3;
 const ID_DEMO_END: usize = 4;
 const TIMER_COLLAPSE: usize = 1;
 const TIMER_REVEAL: usize = 2;
+const TIMER_PAUSE: usize = 3;
+/// Refreshes the media times once a second, only while the media Expanded is visible.
+const TIMER_TIMES: usize = 4;
 const WM_MOUSELEAVE: u32 = 0x02A3;
 const MONITORINFOF_PRIMARY: u32 = 1;
 const WTS_SESSION_LOCK: usize = 0x7;
@@ -67,6 +72,10 @@ struct App {
     /// Last input-window geometry (rect, corner radius). Re-applying an identical region cancels
     /// mouse tracking and fakes a MouseLeave, so unchanged geometry is skipped.
     input_shape: Option<(layout::Rect, i32)>,
+    media: Media,
+    now_playing: Option<Snapshot>,
+    /// Last visual applied and when it was entered (media buttons wait for the content fade-in).
+    shown: (Visual, Instant),
 }
 
 thread_local! {
@@ -119,6 +128,9 @@ pub fn create(startup: Instant) -> Result<()> {
         animations: animations_enabled(),
         hovering: false,
         input_shape: None,
+        media: media::start(host, WM_MEDIA),
+        now_playing: None,
+        shown: (Visual::Hidden, Instant::now()),
     };
     app.add_tray_icon();
     APP.with(|a| *a.borrow_mut() = Some(app));
@@ -194,8 +206,19 @@ impl App {
                     SetWindowRgn(self.input, rgn, true); // system owns rgn after this call
                 }
             }
-            self.renderer.apply(frame, visual, self.island.activity(), self.dpi, animate && self.animations)
+            self.renderer.apply(frame, visual, self.island.activity(), self.now_playing.as_ref(), self.dpi, animate && self.animations)
         })();
+        if self.shown.0 != visual {
+            self.shown = (visual, Instant::now());
+            // Times tick only while they're on screen (spec: Custo da música).
+            unsafe {
+                if visual == Visual::Expanded && self.now_playing.is_some() {
+                    SetTimer(Some(self.host), TIMER_TIMES, 1000, None);
+                } else {
+                    let _ = KillTimer(Some(self.host), TIMER_TIMES);
+                }
+            }
+        }
         if let Err(e) = result {
             log::error(&format!("apply shape failed: {e}"));
         }
@@ -215,9 +238,50 @@ impl App {
                 let _ = KillTimer(Some(self.host), TIMER_COLLAPSE);
                 let _ = KillTimer(Some(self.host), TIMER_REVEAL);
             },
+            island::Timer::StartPause => unsafe {
+                SetTimer(Some(self.host), TIMER_PAUSE, theme::PAUSE_HIDE_MS, None);
+            },
+            island::Timer::StopPause => unsafe {
+                let _ = KillTimer(Some(self.host), TIMER_PAUSE);
+            },
             island::Timer::Keep => {}
         }
         self.apply_shape(animate);
+    }
+
+    /// New media state from the media thread: translate the change into island events.
+    fn media_changed(&mut self) {
+        let new = self.media.latest.lock().ok().and_then(|l| l.clone());
+        let old = std::mem::replace(&mut self.now_playing, new.clone());
+        match (old, new) {
+            (None, Some(n)) if !n.playing => {
+                // Already paused when it appeared (e.g. player opened paused): register it as dormant
+                // without rendering in between — a one-frame Compact would load the text GPU stack for nothing.
+                self.island.on(Event::ActivityStart);
+                self.send(Event::PauseTimeout, true);
+            }
+            (None, Some(_)) => self.send(Event::ActivityStart, true),
+            (Some(_), None) => self.send(Event::ActivityEnd, true),
+            (Some(o), Some(n)) if o.playing != n.playing => self.send(if n.playing { Event::Resumed } else { Event::Paused }, true),
+            _ => self.apply_shape(true), // same activity, new track/position: redraw what changed
+        }
+    }
+
+    /// Click on the media Expanded: map it to a button (client coords of the input window = shape coords).
+    fn media_click(&mut self, x: i32, y: i32) {
+        let (visual, since) = self.shown;
+        let (Some(m), Some(p)) = (&self.now_playing, self.placement) else { return };
+        // Buttons only work once they're visible (content fades in after the morph).
+        if visual != Visual::Expanded || since.elapsed().as_millis() < (theme::CONTENT_FADE_IN_DELAY_MS + theme::CONTENT_FADE_IN_MS) as u128 {
+            return;
+        }
+        let w = p.shape(self.island.shape()).width();
+        let commands = [Command::Previous, Command::TogglePlayPause, Command::Next];
+        for (i, b) in layout::media_buttons(w, p.scale).iter().enumerate() {
+            if m.can[i] && (b.left..b.right).contains(&x) && (b.top..b.bottom).contains(&y) {
+                self.media.command(commands[i]);
+            }
+        }
     }
 
     fn mouse_move(&mut self) {
@@ -367,11 +431,34 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             app.hovering = false;
             app.send(Event::MouseLeave, true);
         }),
-        WM_LBUTTONUP => with_app(|app| app.send(Event::Click, true)),
+        WM_LBUTTONUP => with_app(|app| {
+            let (x, y) = ((lparam.0 & 0xffff) as i16 as i32, ((lparam.0 >> 16) & 0xffff) as i16 as i32);
+            app.media_click(x, y);
+            app.send(Event::Click, true);
+        }),
+        WM_MEDIA => {
+            with_app(|app| app.media_changed());
+            return LRESULT(0);
+        }
+        WM_TIMER if wparam.0 == TIMER_TIMES => {
+            with_app(|app| {
+                if let Err(e) = app.renderer.redraw_front(app.shown.0, app.island.activity()) {
+                    log::warn(&format!("times redraw failed: {e}"));
+                }
+            });
+            return LRESULT(0);
+        }
         WM_TIMER if wparam.0 == TIMER_REVEAL => {
             with_app(|app| {
                 let _ = unsafe { KillTimer(Some(app.host), TIMER_REVEAL) }; // one-shot
                 app.send(Event::RevealTimeout, true);
+            });
+            return LRESULT(0);
+        }
+        WM_TIMER if wparam.0 == TIMER_PAUSE => {
+            with_app(|app| {
+                let _ = unsafe { KillTimer(Some(app.host), TIMER_PAUSE) }; // one-shot
+                app.send(Event::PauseTimeout, true);
             });
             return LRESULT(0);
         }

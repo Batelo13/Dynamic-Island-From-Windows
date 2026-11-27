@@ -4,6 +4,7 @@ mod i18n;
 mod island;
 mod layout;
 mod log;
+mod media;
 mod render;
 mod settings;
 mod theme;
