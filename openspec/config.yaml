@@ -1,0 +1,43 @@
+schema: spec-driven
+
+context: |
+  Product: "Dynamic Island for Windows" - native, ultra-light desktop app (always running).
+  Stack: Rust (stable) + windows-rs; Win32 window + Windows.UI.Composition / DirectComposition,
+  Direct2D + DirectWrite for drawing/text. No Electron/WebView/WPF.
+  Shape: floating capsule centered at top of the work area (not notch-attached).
+  Perf targets: idle RAM < 50 MB, idle CPU < 0.5%, startup < 2 s; no render loop when idle.
+  Security: local-only, no telemetry, no message history, IPC validated and user-scoped, never executes commands.
+  Packaging: MSIX or sparse package (package identity needed for notification listener).
+  Language: artifacts in Portuguese (pt-BR); code identifiers in English.
+  Conventions: small commits on `develop`; Ponytail (simplest working solution, no speculative abstractions).
+
+# Project context (optional)
+# This is shown to AI when creating artifacts.
+# Add your tech stack, conventions, style guides, domain knowledge, etc.
+# Example:
+#   context: |
+#     Tech stack: TypeScript, React, Node.js
+#     We use conventional commits
+#     Domain: e-commerce platform
+
+# Per-artifact rules (optional)
+# Add custom rules for specific artifacts.
+# Example:
+#   rules:
+#     proposal:
+#       - Keep proposals under 500 words
+#       - Always include a "Non-goals" section
+#     tasks:
+#       - Break tasks into chunks of max 2 hours
+
+# Per-operation guidance (optional)
+# Add advisory guidance for how apply and archive work should be conducted.
+# This is separate from artifact rules above.
+# Example:
+#   operations:
+#     apply:
+#       guidance:
+#         - Keep test summaries concise
+#     archive:
+#       guidance:
+#         - Summarize the archive outcome before finishing
