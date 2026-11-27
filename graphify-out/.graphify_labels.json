@@ -1,1 +1,1 @@
-{"0": "Settings Persistence", "1": "Layout Math", "2": "Composition Renderer", "3": "File Logging", "4": "App State & Tray", "5": "Window Creation", "6": "Window Procedure", "7": "Localization", "8": "Entry Point"}
+{"0": "Entry & Win32 Glue", "1": "Island State Machine", "2": "Settings Persistence", "3": "Layout Math", "4": "Shape & Content Apply", "5": "Composition Tree", "6": "Text Drawing Helpers", "7": "File Logging", "8": "GPU Device Lifecycle", "9": "Text Surfaces (A/B)", "10": "Localization", "11": "Fade Animations", "12": "Self Type", "13": "Path Type"}

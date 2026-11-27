@@ -297,7 +297,7 @@ type D3D11CreateDeviceFn = unsafe extern "system" fn(
 ) -> HRESULT;
 
 fn create_device() -> Result<(ID3D11Device, ID2D1Device)> {
-    let create: D3D11CreateDeviceFn = unsafe {
+    let d3d11_create_device: D3D11CreateDeviceFn = unsafe {
         let module = LoadLibraryW(w!("d3d11.dll"))?;
         let proc = GetProcAddress(module, s!("D3D11CreateDevice")).ok_or_else(windows::core::Error::from_thread)?;
         std::mem::transmute::<unsafe extern "system" fn() -> isize, D3D11CreateDeviceFn>(proc)
@@ -306,7 +306,7 @@ fn create_device() -> Result<(ID3D11Device, ID2D1Device)> {
         let mut device = None;
         let flags = D3D11_CREATE_DEVICE_BGRA_SUPPORT;
         let null = std::ptr::null_mut();
-        unsafe { create(null, driver, HMODULE::default(), flags, std::ptr::null(), 0, D3D11_SDK_VERSION, &mut device, null.cast(), null.cast()).ok()? };
+        unsafe { d3d11_create_device(null, driver, HMODULE::default(), flags, std::ptr::null(), 0, D3D11_SDK_VERSION, &mut device, null.cast(), null.cast()).ok()? };
         device.ok_or_else(|| windows::core::Error::from_hresult(windows::Win32::Foundation::E_FAIL))
     };
     let d3d = make(D3D_DRIVER_TYPE_HARDWARE).or_else(|_| make(D3D_DRIVER_TYPE_WARP))?;
