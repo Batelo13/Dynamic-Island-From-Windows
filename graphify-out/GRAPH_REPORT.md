@@ -1,47 +1,50 @@
-# Graph Report - src  (2026-11-26)
+# Graph Report - src  (2026-11-27)
 
 ## Corpus Check
-- 9 files · ~0 words
+- 10 files · ~0 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 150 nodes · 293 edges · 14 communities (12 shown, 2 thin omitted)
-- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 2 edges (avg confidence: 0.8)
+- 209 nodes · 437 edges · 17 communities (12 shown, 5 thin omitted)
+- Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 5 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Community Hubs (Navigation)
-- Entry & Win32 Glue
+- Media Source
+- Window & Messages
 - Island State Machine
-- Settings Persistence
 - Layout Math
-- Shape & Content Apply
+- Settings Persistence
+- Community 5
+- Content Drawing
 - Composition Tree
-- Text Drawing Helpers
 - File Logging
 - GPU Device Lifecycle
-- Text Surfaces (A/B)
+- Content Drawing
 - Localization
-- Fade Animations
-- Self Type
-- Path Type
+- Community 12
+- Community 13
+- Community 14
+- Settings Persistence
+- Community 16
 
 ## God Nodes (most connected - your core abstractions)
-1. `Renderer` - 24 edges
-2. `App` - 20 edges
-3. `wndproc()` - 14 edges
-4. `Rect` - 11 edges
-5. `draw()` - 11 edges
-6. `place()` - 9 edges
-7. `Settings` - 8 edges
-8. `Island` - 8 edges
-9. `Gpu` - 8 edges
-10. `create()` - 8 edges
+1. `Renderer` - 29 edges
+2. `App` - 27 edges
+3. `Snapshot` - 23 edges
+4. `wndproc()` - 17 edges
+5. `draw()` - 16 edges
+6. `Rect` - 12 edges
+7. `run()` - 12 edges
+8. `Media` - 10 edges
+9. `Island` - 9 edges
+10. `place()` - 9 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `create_device()` --calls--> `create()`  [INFERRED]
-  render.rs → window.rs
-- `Renderer` --references--> `Visual`  [EXTRACTED]
+- `draw()` --references--> `Visual`  [EXTRACTED]
   render.rs → island.rs
+- `App` --references--> `Visual`  [EXTRACTED]
+  window.rs → island.rs
 - `App` --references--> `Island`  [EXTRACTED]
   window.rs → island.rs
 - `App` --references--> `Rect`  [EXTRACTED]
@@ -52,67 +55,69 @@
 ## Import Cycles
 - None detected.
 
-## Communities (14 total, 2 thin omitted)
+## Communities (17 total, 5 thin omitted)
 
-### Community 0 - "Entry & Win32 Glue"
-Cohesion: 0.13
-Nodes (19): FnOnce, Instant, LPARAM, LRESULT, NOTIFYICONDATAW, PathBuf, Settings, Vec (+11 more)
+### Community 0 - "Media Source"
+Cohesion: 0.11
+Nodes (30): A, Arc, ArtCache, IRandomAccessStreamReference, IWICImagingFactory, Command, content_key_ignores_position(), decode_art() (+22 more)
 
-### Community 1 - "Island State Machine"
-Cohesion: 0.21
-Nodes (13): activity_end_hides_unless_cursor_is_on_it(), activity_shows_compact_without_gesture_and_collapses_to_it(), click_on_revealed_idle_expands_clock_then_hides(), Event, hover_grows_within_8_percent_and_reverts(), Island, returning_before_timeout_keeps_it(), revealed() (+5 more)
+### Community 1 - "Window & Messages"
+Cohesion: 0.15
+Nodes (18): FnOnce, LPARAM, LRESULT, NOTIFYICONDATAW, animations_enabled(), App, create(), enum_monitors() (+10 more)
 
-### Community 2 - "Settings Persistence"
+### Community 2 - "Island State Machine"
+Cohesion: 0.17
+Nodes (20): activity_end_hides_unless_cursor_is_on_it(), activity_shows_compact_without_gesture_and_collapses_to_it(), click_on_revealed_idle_expands_clock_then_hides(), Event, hover_grows_within_8_percent_and_reverts(), Island, pause_keeps_visible_then_goes_dormant_and_hidden(), pause_timeout_under_cursor_waits_for_the_cursor_to_leave() (+12 more)
+
+### Community 3 - "Layout Math"
+Cohesion: 0.19
+Nodes (14): centered_with_margin_at_100_percent(), media_buttons(), media_buttons_are_centered_on_the_controls_row_without_overlap(), Monitor, pick(), place(), Placement, r() (+6 more)
+
+### Community 4 - "Settings Persistence"
 Cohesion: 0.18
 Nodes (16): Default, corrupt_file_is_backed_up(), default_path(), load(), margin_is_clamped(), missing_file_gives_defaults(), roundtrip_and_partial_json(), Option (+8 more)
 
-### Community 3 - "Layout Math"
-Cohesion: 0.24
-Nodes (11): centered_with_margin_at_100_percent(), Monitor, pick(), place(), Placement, r(), Rect, respects_work_area_offset_top_taskbar_and_second_monitor() (+3 more)
+### Community 5 - "Community 5"
+Cohesion: 0.27
+Nodes (8): CVisual, Visual, Frame, ms(), Option, v2(), TimeSpan, Vector2
 
-### Community 4 - "Shape & Content Apply"
-Cohesion: 0.33
-Nodes (6): Visual, draw(), Frame, v2(), SizeInt32, Vector2
-
-### Community 5 - "Composition Tree"
+### Community 6 - "Content Drawing"
 Cohesion: 0.22
-Nodes (9): CompositionRoundedRectangleGeometry, CompositionSpriteShape, CompositionVisualSurface, Compositor, ContainerVisual, DesktopWindowTarget, DispatcherQueueController, Renderer (+1 more)
+Nodes (11): D2D1_COLOR_F, color(), color_f(), draw(), mmss(), now_strings(), Duration, HWND (+3 more)
 
-### Community 6 - "Text Drawing Helpers"
-Cohesion: 0.25
-Nodes (7): D2D1_COLOR_F, color(), color_f(), now_strings(), HWND, String, Self
+### Community 7 - "Composition Tree"
+Cohesion: 0.18
+Nodes (11): CompositionEllipseGeometry, CompositionRoundedRectangleGeometry, CompositionSpriteShape, CompositionVisualSurface, Compositor, ContainerVisual, ContentKey, DesktopWindowTarget (+3 more)
 
-### Community 7 - "File Logging"
+### Community 8 - "File Logging"
 Cohesion: 0.36
 Nodes (7): append(), error(), info(), rotates_and_caps_disk_usage(), Path, warn(), write()
 
-### Community 8 - "GPU Device Lifecycle"
-Cohesion: 0.36
-Nodes (6): HANDLE, ID2D1Device, create_device(), Option, Result, watch_device()
+### Community 9 - "GPU Device Lifecycle"
+Cohesion: 0.39
+Nodes (6): HANDLE, ID2D1Device, ID3D11Device, create_device(), Result, watch_device()
 
-### Community 9 - "Text Surfaces (A/B)"
+### Community 10 - "Content Drawing"
 Cohesion: 0.33
-Nodes (6): CompositionDrawingSurface, CompositionGraphicsDevice, ID3D11Device, IDWriteFactory, Content, Gpu
+Nodes (6): CompositionDrawingSurface, CompositionGraphicsDevice, IDWriteFactory, Content, Gpu, SpriteVisual
 
-### Community 10 - "Localization"
+### Community 11 - "Localization"
 Cohesion: 0.83
 Nodes (3): is_portuguese(), t(), Text
 
-### Community 11 - "Fade Animations"
-Cohesion: 0.50
-Nodes (3): ms(), SpriteVisual, TimeSpan
-
 ## Knowledge Gaps
-- **2 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **5 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `App` connect `Entry & Win32 Glue` to `Island State Machine`, `Layout Math`, `Composition Tree`?**
-  _High betweenness centrality (0.274) - this node is a cross-community bridge._
-- **Why does `Renderer` connect `Composition Tree` to `Entry & Win32 Glue`, `Shape & Content Apply`, `Text Drawing Helpers`, `GPU Device Lifecycle`, `Text Surfaces (A/B)`, `Fade Animations`?**
-  _High betweenness centrality (0.235) - this node is a cross-community bridge._
-- **Why does `Rect` connect `Layout Math` to `Entry & Win32 Glue`?**
-  _High betweenness centrality (0.074) - this node is a cross-community bridge._
-- **Should `Entry & Win32 Glue` be split into smaller, more focused modules?**
-  _Cohesion score 0.12903225806451613 - nodes in this community are weakly interconnected._
+- **Why does `App` connect `Window & Messages` to `Media Source`, `Island State Machine`, `Layout Math`, `Settings Persistence`, `Community 5`, `Composition Tree`?**
+  _High betweenness centrality (0.473) - this node is a cross-community bridge._
+- **Why does `Renderer` connect `Composition Tree` to `Media Source`, `Window & Messages`, `Community 5`, `Content Drawing`, `GPU Device Lifecycle`, `Content Drawing`?**
+  _High betweenness centrality (0.225) - this node is a cross-community bridge._
+- **Why does `Snapshot` connect `Media Source` to `Window & Messages`, `Community 5`, `Content Drawing`, `Composition Tree`?**
+  _High betweenness centrality (0.215) - this node is a cross-community bridge._
+- **Should `Media Source` be split into smaller, more focused modules?**
+  _Cohesion score 0.11428571428571428 - nodes in this community are weakly interconnected._
+- **Should `Window & Messages` be split into smaller, more focused modules?**
+  _Cohesion score 0.14516129032258066 - nodes in this community are weakly interconnected._

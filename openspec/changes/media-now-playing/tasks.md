@@ -34,5 +34,5 @@
 - [ ] 5.3 `check-window.ps1` continua passando (sem música tocando)
 - [ ] 5.4 Benchmark 10 min com música tocando em Compact (RAM privada < 50 MB, CPU < 0,5%) em `docs/benchmarks.md`
 - [ ] 5.5 Screenshots Compact/Expanded com música comparados às refs 1, 4 e 5; ajustar tokens (inclusive altura do Expanded)
-- [ ] 5.6 Graphify `--update`
+- [x] 5.6 Graphify `--update`
 - [ ] 5.7 `openspec validate media-now-playing --strict`

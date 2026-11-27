@@ -8,7 +8,9 @@ param(
     [double]$Minutes = 10,
     [string]$Exe = "",
     [switch]$Demo,
-    [switch]$Transitions
+    [switch]$Transitions,
+    # Label for the result row (e.g. "Compact com música"); default derives from -Demo.
+    [string]$State = ""
 )
 $ErrorActionPreference = 'Stop'
 if (-not $Exe) { $Exe = if ($Demo -or $Transitions) { "$PSScriptRoot\..\target\profiling\dynamic-island.exe" } else { "$PSScriptRoot\..\target\release\dynamic-island.exe" } }
@@ -80,6 +82,9 @@ while (((Get-Date) - $t0).TotalMinutes -lt $Minutes) {
     $pws += (Get-CimInstance Win32_PerfFormattedData_PerfProc_Process -Filter "IDProcess=$($p.Id)").WorkingSetPrivate / 1MB
 }
 $p.Refresh()
+# What the island looked like at the end (proves which state was measured).
+$ir = New-Object B+R; [void][B]::GetWindowRect([B]::FindWindow('DynamicIslandWindow', 'Dynamic Island Input'), [ref]$ir)
+$inputSize = "{0}x{1}" -f ($ir.Rt - $ir.L), ($ir.B - $ir.T)
 $wall = ((Get-Date) - $t0).TotalSeconds
 $cpuPct = ($p.TotalProcessorTime - $cpu0).TotalSeconds / ($wall * $cores) * 100
 $stats = { param($a) "{0:N1} avg / {1:N1} peak" -f ($a | Measure-Object -Average).Average, ($a | Measure-Object -Maximum).Maximum }
@@ -88,7 +93,8 @@ Stop-Process -Id $p.Id -Force
 $cpuName = (Get-CimInstance Win32_Processor).Name.Trim()
 $os = (Get-CimInstance Win32_OperatingSystem)
 $size = "{0:N0} KB" -f ((Get-Item $Exe).Length / 1KB)
-$state = if ($Demo) { 'Compact (D3D/texto carregados)' } else { 'Idle' }
+$state = if ($State) { $State } elseif ($Demo) { 'Compact (D3D/texto carregados)' } else { 'Idle' }
+$state += " (entrada no fim: $inputSize)"
 @"
 | Data | Estado | Duração | RAM privada (MB, meta < 50) | Commit privado (MB) | Working set (MB) | CPU média | Binário |
 |---|---|---|---|---|---|---|---|
