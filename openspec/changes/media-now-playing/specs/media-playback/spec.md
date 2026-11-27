@@ -23,6 +23,10 @@ O sistema SHALL acompanhar a sessão de mídia que o Windows considera atual (a 
 - **WHEN** o player que estava na ilha é fechado
 - **THEN** a ilha passa para a próxima sessão atual do Windows ou, se não houver nenhuma, fica Oculta
 
+#### Scenario: Player fechado para a bandeja
+- **WHEN** o usuário fecha a janela do player e ele continua rodando em segundo plano com a sessão vazia (sem título)
+- **THEN** a ilha trata isso como "sem música": fica Oculta e, revelada pelo topo, mostra a cápsula Idle
+
 ### Requirement: Compact de música
 Com música tocando, o Compact SHALL mostrar a capa da faixa em miniatura, com cantos arredondados, à esquerda, e barrinhas de equalizador animadas à direita. Com a música pausada, as barrinhas SHALL ficar paradas e baixas.
 
@@ -71,6 +75,10 @@ Os botões do Expanded SHALL enviar ao player os comandos anterior, tocar/pausar
 #### Scenario: Comando não suportado
 - **WHEN** o player informa que não aceita "anterior"
 - **THEN** o botão anterior aparece esmaecido e o clique nele não faz nada
+
+#### Scenario: Passar o mouse sobre um botão
+- **WHEN** o cursor passa sobre um botão habilitado do Expanded
+- **THEN** um círculo claro e suave cresce atrás do ícone, o cursor vira a mão de clique, e ambos somem quando o cursor sai do botão; botões esmaecidos não reagem
 
 #### Scenario: Clique fora dos botões
 - **WHEN** o usuário clica no Expanded fora dos botões

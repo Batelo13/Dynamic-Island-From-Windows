@@ -165,6 +165,10 @@ fn snapshot(session: Option<&Session>, wic: &IWICImagingFactory, art_cache: &mut
         return None;
     }
     let (title, artist) = (props.Title().ok()?.to_string(), props.Artist().map(|a| a.to_string()).unwrap_or_default());
+    if title.is_empty() {
+        // Players closed to the tray (Spotify) keep an empty session alive: nothing is playing, so no island.
+        return None;
+    }
     let can = info.Controls().map_or([false; 3], |c| {
         [c.IsPreviousEnabled().unwrap_or(false), c.IsPlayPauseToggleEnabled().unwrap_or(false), c.IsNextEnabled().unwrap_or(false)]
     });

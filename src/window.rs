@@ -76,6 +76,8 @@ struct App {
     now_playing: Option<Snapshot>,
     /// Last visual applied and when it was entered (media buttons wait for the content fade-in).
     shown: (Visual, Instant),
+    /// Media button under the cursor (Expanded), for the hover highlight and the hand cursor.
+    hovered_button: Option<usize>,
 }
 
 thread_local! {
@@ -131,6 +133,7 @@ pub fn create(startup: Instant) -> Result<()> {
         media: media::start(host, WM_MEDIA),
         now_playing: None,
         shown: (Visual::Hidden, Instant::now()),
+        hovered_button: None,
     };
     app.add_tray_icon();
     APP.with(|a| *a.borrow_mut() = Some(app));
@@ -210,6 +213,7 @@ impl App {
         })();
         if self.shown.0 != visual {
             self.shown = (visual, Instant::now());
+            self.set_hovered_button(None);
             // Times tick only while they're on screen (spec: Custo da música).
             unsafe {
                 if visual == Visual::Expanded && self.now_playing.is_some() {
@@ -267,24 +271,40 @@ impl App {
         }
     }
 
-    /// Click on the media Expanded: map it to a button (client coords of the input window = shape coords).
-    fn media_click(&mut self, x: i32, y: i32) {
+    /// Enabled media button at (x, y) in input-window client coords (= shape coords), once the
+    /// media Expanded content is visible (it fades in after the morph).
+    fn media_button_at(&self, x: i32, y: i32) -> Option<usize> {
         let (visual, since) = self.shown;
-        let (Some(m), Some(p)) = (&self.now_playing, self.placement) else { return };
-        // Buttons only work once they're visible (content fades in after the morph).
+        let (Some(m), Some(p)) = (&self.now_playing, self.placement) else { return None };
         if visual != Visual::Expanded || since.elapsed().as_millis() < (theme::CONTENT_FADE_IN_DELAY_MS + theme::CONTENT_FADE_IN_MS) as u128 {
-            return;
+            return None;
         }
         let w = p.shape(self.island.shape()).width();
-        let commands = [Command::Previous, Command::TogglePlayPause, Command::Next];
-        for (i, b) in layout::media_buttons(w, p.scale).iter().enumerate() {
-            if m.can[i] && (b.left..b.right).contains(&x) && (b.top..b.bottom).contains(&y) {
-                self.media.command(commands[i]);
-            }
+        layout::media_buttons(w, p.scale)
+            .iter()
+            .position(|b| (b.left..b.right).contains(&x) && (b.top..b.bottom).contains(&y))
+            .filter(|&i| m.can[i])
+    }
+
+    fn media_click(&mut self, x: i32, y: i32) {
+        if let Some(i) = self.media_button_at(x, y) {
+            self.media.command([Command::Previous, Command::TogglePlayPause, Command::Next][i]);
         }
     }
 
-    fn mouse_move(&mut self) {
+    /// Hover highlight only changes when the button under the cursor changes (mouse moves are frequent).
+    fn set_hovered_button(&mut self, button: Option<usize>) {
+        if self.hovered_button == button {
+            return;
+        }
+        self.hovered_button = button;
+        if let Err(e) = self.renderer.set_button_hover(button, self.animations) {
+            log::warn(&format!("button hover failed: {e}"));
+        }
+    }
+
+    fn mouse_move(&mut self, x: i32, y: i32) {
+        self.set_hovered_button(self.media_button_at(x, y));
         if self.hovering {
             return;
         }
@@ -426,8 +446,18 @@ fn request_relayout(hwnd: HWND) {
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_MOUSEACTIVATE => return LRESULT(MA_NOACTIVATE as isize),
-        WM_MOUSEMOVE => with_app(|app| app.mouse_move()),
+        WM_MOUSEMOVE => with_app(|app| app.mouse_move((lparam.0 & 0xffff) as i16 as i32, ((lparam.0 >> 16) & 0xffff) as i16 as i32)),
+        WM_SETCURSOR => {
+            // Hand cursor over a media button.
+            let mut on_button = false;
+            with_app(|app| on_button = hwnd == app.input && app.hovered_button.is_some());
+            if on_button {
+                unsafe { SetCursor(LoadCursorW(None, IDC_HAND).ok()) };
+                return LRESULT(1);
+            }
+        }
         WM_MOUSELEAVE => with_app(|app| {
+            app.set_hovered_button(None);
             app.hovering = false;
             app.send(Event::MouseLeave, true);
         }),

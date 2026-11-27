@@ -86,6 +86,9 @@ pub struct Renderer {
     /// composition visuals animated by the compositor, so playing music costs the app nothing.
     bars: ContainerVisual,
     progress: SpriteVisual,
+    /// Circle behind the hovered media button; sits under the drawn content so the glyph stays on top.
+    button_hover: ShapeVisual,
+    button_hover_circle: windows::UI::Composition::CompositionEllipseGeometry,
     dpi: u32,
     media: Option<Snapshot>,
     /// Signalled by D3D when the device is removed; window waits on it (no polling).
@@ -158,6 +161,13 @@ impl Renderer {
         let progress = compositor.CreateSpriteVisual()?;
         progress.SetBrush(&compositor.CreateColorBrushWithColor(color(theme::TEXT_PRIMARY))?)?;
         progress.SetOpacity(0.0)?;
+        let button_hover = compositor.CreateShapeVisual()?;
+        let button_hover_circle = compositor.CreateEllipseGeometry()?;
+        let circle = compositor.CreateSpriteShapeWithGeometry(&button_hover_circle)?;
+        circle.SetFillBrush(&compositor.CreateColorBrushWithColor(color(theme::BUTTON_HOVER))?)?;
+        button_hover.Shapes()?.Append(&circle)?;
+        button_hover.SetOpacity(0.0)?;
+        root.Children()?.InsertAtTop(&button_hover)?; // content layers are added above it later
         target.SetRoot(&root)?;
         Ok(Self {
             _queue: queue,
@@ -174,6 +184,8 @@ impl Renderer {
             content: None,
             bars,
             progress,
+            button_hover,
+            button_hover_circle,
             dpi: 96,
             media: None,
             device_removed: None,
@@ -223,6 +235,33 @@ impl Renderer {
         let (Some(frame), Some(gpu)) = (self.frame, self.gpu.as_ref()) else { return Ok(()) };
         let size = SizeInt32 { Width: frame.w.ceil() as i32, Height: frame.h.ceil() as i32 };
         draw(gpu, &gpu.layers[gpu.front].surface, size, visual, activity, self.media.as_ref(), self.dpi as f32 / 96.0)
+    }
+
+    /// Highlight the hovered media button (`None` hides it). Pure composition: no redraw.
+    pub fn set_button_hover(&self, button: Option<usize>, animate: bool) -> Result<()> {
+        let v: CVisual = self.button_hover.cast()?;
+        let (Some(i), Some(f)) = (button, self.frame) else {
+            return self.fade(&v, 0.0, 0, theme::BUTTON_HOVER_MS, animate);
+        };
+        let scale = self.dpi as f32 / 96.0;
+        let b = crate::layout::media_buttons(f.w.round() as i32, scale)[i];
+        let d = (b.right - b.left) as f32;
+        self.button_hover.SetSize(v2(d, d))?;
+        self.button_hover.SetOffset(Vector3 { X: f.x + b.left as f32, Y: f.y + b.top as f32, Z: 0.0 })?;
+        self.button_hover_circle.SetCenter(v2(d / 2.0, d / 2.0))?;
+        self.button_hover_circle.SetRadius(v2(d / 2.0, d / 2.0))?;
+        self.button_hover.SetCenterPoint(Vector3 { X: d / 2.0, Y: d / 2.0, Z: 0.0 })?;
+        if animate {
+            // Grow in from 80% while fading in.
+            let grow = self.compositor.CreateVector3KeyFrameAnimation()?;
+            grow.InsertKeyFrame(0.0, Vector3 { X: 0.8, Y: 0.8, Z: 1.0 })?;
+            grow.InsertKeyFrame(1.0, Vector3 { X: 1.0, Y: 1.0, Z: 1.0 })?;
+            grow.SetDuration(ms(theme::BUTTON_HOVER_MS))?;
+            self.button_hover.StartAnimation(h!("Scale"), &grow)?;
+        } else {
+            self.button_hover.SetScale(Vector3 { X: 1.0, Y: 1.0, Z: 1.0 })?;
+        }
+        self.fade(&v, 1.0, 0, theme::BUTTON_HOVER_MS, animate)
     }
 
     /// Bars (media Compact) and progress fill (media Expanded with a known duration).

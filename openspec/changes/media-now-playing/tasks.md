@@ -24,6 +24,8 @@
 - [x] 4.2 Expanded: capa, título/artista com reticências, tempos, botões com Segoe Fluent Icons (esmaecidos se indisponíveis), ícone tocar/pausar conforme estado (D5)
 - [x] 4.3 Barra de progresso com `Scale.X` linear no compositor, reiniciada a cada snapshot; oculta sem duração
 - [x] 4.4 Chave de conteúdo inclui faixa e estado; barrinhas e progresso não forçam redesenho (D6)
+- [x] 4.5 Hover nos botões do Expanded: círculo claro com crescimento (compositor) e cursor de mão; só em botões habilitados
+- [x] 4.6 Sessão sem título (player fechado para a bandeja) = sem música
 
 ## 5. Validação
 

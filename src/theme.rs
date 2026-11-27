@@ -77,3 +77,6 @@ pub const BUTTON_SPACING_DIP: f32 = 64.0;
 pub const BUTTON_HIT_DIP: f32 = 36.0;
 pub const FONT_BUTTON_DIP: f32 = 22.0;
 pub const DISABLED: u32 = 0x5A5A5E;
+/// Hover highlight behind a media button: soft light circle that grows in (iOS-like).
+pub const BUTTON_HOVER: u32 = 0x3A3A3C;
+pub const BUTTON_HOVER_MS: i64 = 140;
